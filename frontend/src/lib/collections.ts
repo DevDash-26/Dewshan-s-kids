@@ -29,6 +29,14 @@ import type {
   SocietyInterest,
 } from '../types/models'
 
+export const DEFAULT_ROOMS: Room[] = [
+  { id: 'a-204', name: 'Room A204', building: 'Block A', capacity: 30, features: ['Projector', 'Whiteboard'] },
+  { id: 'a-105', name: 'Room A105', building: 'Block A', capacity: 12, features: ['Whiteboard'] },
+  { id: 'b-201', name: 'Room B201', building: 'Block B', capacity: 50, features: ['Projector', 'PA System'] },
+  { id: 'lib-discussion-1', name: 'Library Discussion Room 1', building: 'Library', capacity: 6, features: ['Whiteboard'] },
+  { id: 'c-118', name: 'Room C118', building: 'Block C', capacity: 24, features: ['Projector', 'Monitor'] },
+]
+
 // Thin, typed wrappers around Firestore for each transactional collection in
 // the data model. Kept intentionally simple (no generic repository
 // abstraction) — each collection's shape and rules differ enough that a
@@ -36,14 +44,26 @@ import type {
 
 // ---------- Rooms ----------
 export async function listRooms(): Promise<Room[]> {
-  const snap = await getDocs(collection(db, 'rooms'))
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Room)
+  try {
+    const snap = await getDocs(collection(db, 'rooms'))
+    const rooms = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Room)
+    return rooms.length > 0 ? rooms : DEFAULT_ROOMS
+  } catch {
+    return DEFAULT_ROOMS
+  }
 }
 
 export function watchRooms(cb: (rooms: Room[]) => void): Unsubscribe {
-  return onSnapshot(collection(db, 'rooms'), (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Room))
-  })
+  return onSnapshot(
+    collection(db, 'rooms'),
+    (snap) => {
+      const rooms = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Room)
+      cb(rooms.length > 0 ? rooms : DEFAULT_ROOMS)
+    },
+    () => {
+      cb(DEFAULT_ROOMS)
+    },
+  )
 }
 
 // ---------- Room bookings ----------

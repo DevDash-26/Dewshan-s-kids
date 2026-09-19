@@ -19,7 +19,7 @@ const TYPE_LABELS: Record<FacilityIssueType, string> = {
 const STATUS_COLOR: Record<RequestStatus, 'amber' | 'blue' | 'green'> = { OPEN: 'amber', IN_PROGRESS: 'blue', RESOLVED: 'green' }
 
 export function FacilityIssuesPage() {
-  const { profile } = useAuth()
+  const { profile, loading: authLoading } = useAuth()
   const [issues, setIssues] = useState<FacilityIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [issueType, setIssueType] = useState<FacilityIssueType>('ELECTRICAL')
@@ -39,8 +39,12 @@ export function FacilityIssuesPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (authLoading) {
+      setError('Your session is still loading. Please wait a moment and try again.')
+      return
+    }
     if (!profile) {
-      setError('Your session hasn\'t finished loading yet — please wait a moment and try again.')
+      setError('Your Firebase profile could not be loaded. Start the local Firebase emulators and sign in again.')
       return
     }
     if (!location.trim() || !description.trim()) {

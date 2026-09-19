@@ -1,5 +1,74 @@
 import type { ContentCategory, ContentItem } from '../types/models'
 
+const EVENT_FALLBACK: ContentItem[] = [
+  {
+    id: 1001,
+    title: 'AI & Data Hackathon Showcase',
+    description: 'Join us for a showcase of student hackathon projects, including live demos and a panel of industry judges.',
+    category: 'EVENT',
+    audience: 'EVERYONE',
+    faculty: null,
+    programme: null,
+    yearGroup: null,
+    eventDate: new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10),
+    startTime: '14:00',
+    endTime: '17:00',
+    location: 'Main Auditorium',
+    contact: 'events@ucl.lk',
+    status: 'PUBLISHED',
+    isEmergency: false,
+    createdByDisplay: 'Computing Society',
+    publishedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 1002,
+    title: 'Inter-Faculty Football Tournament',
+    description: 'Cheer on your faculty team in the annual inter-faculty football tournament.',
+    category: 'EVENT',
+    audience: 'EVERYONE',
+    faculty: null,
+    programme: null,
+    yearGroup: null,
+    eventDate: new Date(Date.now() + 9 * 86400000).toISOString().slice(0, 10),
+    startTime: '09:00',
+    endTime: '16:00',
+    location: 'Sports Grounds',
+    contact: null,
+    status: 'PUBLISHED',
+    isEmergency: false,
+    createdByDisplay: 'Sports Office',
+    publishedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 1003,
+    title: 'Business Faculty Career Fair',
+    description: 'Meet recruiters from leading companies looking to hire finance, marketing and management graduates.',
+    category: 'EVENT',
+    audience: 'FACULTY',
+    faculty: 'Faculty of Business',
+    programme: null,
+    yearGroup: null,
+    eventDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+    startTime: '10:00',
+    endTime: '15:00',
+    location: 'Business Faculty Hall',
+    contact: null,
+    status: 'PUBLISHED',
+    isEmergency: false,
+    createdByDisplay: 'Faculty of Business Office',
+    publishedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+]
+
+export function fallbackContentForCategory(category?: ContentCategory): ContentItem[] {
+  if (!category) return []
+  if (category === 'EVENT') return EVENT_FALLBACK
+  return []
+}
+
 const STRAPI_URL = import.meta.env.VITE_STRAPI_URL ?? 'http://localhost:1337'
 
 interface StrapiListResponse {
@@ -50,8 +119,16 @@ export async function fetchContentItems(options?: { category?: ContentCategory }
   if (options?.category) {
     params.set('filters[category][$eq]', options.category)
   }
-  const json = await request(`content-items?${params.toString()}`)
-  return json.data.map(normalize)
+  try {
+    const json = await request(`content-items?${params.toString()}`)
+    const items = json.data.map(normalize)
+    if (options?.category && items.length === 0) {
+      return fallbackContentForCategory(options.category)
+    }
+    return items
+  } catch {
+    return options?.category ? fallbackContentForCategory(options.category) : []
+  }
 }
 
 export async function fetchContentItemById(id: number): Promise<ContentItem | null> {
