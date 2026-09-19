@@ -7,7 +7,7 @@ UCL Connect is a hackathon-ready campus hub prototype for Universal College Lank
 ## Features
 
 - Branded responsive dashboard with quick actions, announcements, events and academic calendar
-- Demo sign-in flow, role model and staff dashboard
+- Firebase email/password authentication restricted to `@ucl.lk`, persistent auth state, password reset support and a role model with staff dashboard
 - Event interest, society membership interest and classroom booking flows
 - AI assistant at `/assistant` with source links, suggested prompts and deterministic fallback mode
 - Campus services, jobs, announcements, academic calendar, profile and support-ready routes
@@ -23,7 +23,10 @@ React, TypeScript, Vite, Tailwind CSS v4, Lucide React, React Router, Firebase A
 ## Architecture
 
 - `src/services/firebase.ts` initializes Firebase only when real values are present.
-- `src/services/auth.ts` owns auth/role helpers and demo credentials.
+- `src/auth/AuthContext.tsx` owns the persistent auth session, profile loading, registration, login, logout and permission helpers.
+- `src/auth/permissions.ts` is the central role-to-permission map used by the UI and route guards.
+- `src/auth/validation.ts` validates UCL email addresses, password strength and Firebase error messages.
+- `src/services/authService.ts` owns Firebase Auth calls. `src/services/userService.ts` owns `users/{uid}` profile documents.
 - `src/services/firestore.ts` owns transactional application operations.
 - `src/services/strapi.ts` owns CMS reads and falls back to demo content when Strapi is unavailable.
 - `src/services/ai.ts` owns Gemini integration and a deterministic UCL-specific fallback.
@@ -55,7 +58,20 @@ Vite exposes `VITE_*` variables to the browser. For production, privileged Gemin
 3. Create a Firestore database.
 4. Add the web app config values to `.env`.
 5. Deploy or paste `firestore.rules` in Firestore Rules.
-6. Create user profile documents with roles: `student`, `admin`, `academic`, `society_manager`, `finance`, or `facilities`.
+6. Create user profile documents with roles: `student`, `admin`, `academic`, `society_manager`, `finance`, `administrative`, or `facilities`. Normal registration always writes `student`; privileged role assignment must happen through an admin-controlled backend or Firebase Admin SDK.
+
+Firebase Authentication stores passwords. Firestore stores only the application profile under `users/{uid}`. Passwords are never written to Firestore.
+
+## Demo seeding
+
+The repeatable seed uses the Firebase Admin SDK and a service-account file, so it does not expose privileged credentials in the browser:
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\firebase-service-account.json"
+npm run seed
+```
+
+The script creates deterministic demo users and content across announcements, events, societies, FAQs, jobs, classrooms, finance, wellbeing, dining, printing, library and student-life collections. It uses merge writes and does not create passwords. Set demo passwords or send reset emails from Firebase Console. Never point this script at production without reviewing the IDs first.
 
 ## Strapi setup
 
@@ -75,12 +91,9 @@ VITE_GEMINI_API_KEY=YOUR_KEY_HERE
 
 The browser integration is intentionally simple for this hackathon. A production deployment should proxy Gemini through a server-side function with rate limiting and authenticated access.
 
-## Demo access
+## Demo roles
 
-- Email: `aarav.perera@demo.ucl.lk`
-- Password: `DemoPass123!`
-
-These are fictional demo values and do not authenticate against a real service until Firebase Auth is connected.
+The seed creates `student@ucl.lk`, `academic@ucl.lk`, `society.manager@ucl.lk`, `finance@ucl.lk`, `administrative@ucl.lk`, `facilities@ucl.lk` and `admin@ucl.lk`. Assign temporary passwords only through Firebase Console or a private Admin SDK workflow; do not commit them.
 
 ## Validation and deployment
 
@@ -93,4 +106,4 @@ For Firebase Hosting, run `firebase init hosting`, choose `dist` as the public d
 
 ## Security model
 
-Firestore rules require authentication for application reads and writes, restrict user-owned records to their owner, and grant broader operational writes only to staff roles. Validate role claims again in Cloud Functions for production. Never use `allow read, write: if true;`.
+Firestore rules require authentication for application reads and writes, restrict user-owned records to their owner, prevent students from changing `role` or `isActive`, and grant collection writes only to the owning staff roles. The profile role lookup is suitable for this prototype, but custom claims set by a trusted Admin SDK/Cloud Function are preferable for high-risk production authorization. Never use `allow read, write: if true;`.

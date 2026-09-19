@@ -1,7 +1,7 @@
 import type { Announcement, Event, Room, ServiceItem, Society, UserProfile } from '../types';
 
 export const demoUser: UserProfile = {
-  id: 'demo-student-01', name: 'Aarav Perera', email: 'aarav.perera@demo.ucl.lk', role: 'student', faculty: 'Computing', programme: 'BSc Computer Science', year: 2,
+  id: 'demo-student-01', uid: 'demo-student-01', name: 'Aarav Perera', displayName: 'Aarav Perera', email: 'aarav.perera@ucl.lk', role: 'student', isActive: true, faculty: 'Computing', programme: 'BSc Computer Science', year: 2,
 };
 
 export const events: Event[] = [

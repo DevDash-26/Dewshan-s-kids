@@ -1,11 +1,19 @@
-export type UserRole = 'student' | 'admin' | 'academic' | 'society_manager' | 'finance' | 'facilities';
+export type UserRole = 'student' | 'academic' | 'society_manager' | 'finance' | 'administrative' | 'facilities' | 'admin';
 export type EventCategory = 'Academic' | 'Society' | 'Sports' | 'Workshop' | 'Guest Lecture' | 'Career' | 'Social' | 'Other';
 
 export interface UserProfile {
   id: string;
+  uid: string;
   name: string;
+  displayName: string;
   email: string;
   role: UserRole;
+  department?: string;
+  studentId?: string;
+  staffId?: string;
+  phone?: string;
+  photoURL?: string;
+  isActive: boolean;
   faculty: string;
   programme: string;
   year: number;

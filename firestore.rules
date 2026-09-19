@@ -2,13 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function isAdmin() { return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
-    function isStaff() { return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'academic', 'society_manager', 'finance', 'facilities']; }
+    function role() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
+    function isAdmin() { return signedIn() && role() == 'admin'; }
+    function hasRole(roles) { return signedIn() && role() in roles; }
+    function isStaff() { return hasRole(['admin', 'academic', 'society_manager', 'finance', 'administrative', 'facilities']); }
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role == 'student';
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == userId && request.resource.data.role == resource.data.role && request.resource.data.isActive == resource.data.isActive && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'phone', 'photoURL', 'department', 'studentId', 'updatedAt']));
     }
     match /eventInterests/{interestId} {
       allow read: if signedIn() && (resource.data.userId == request.auth.uid || isStaff());
@@ -22,10 +24,43 @@ service cloud.firestore {
       allow read, update, delete: if signedIn() && (resource.data.userId == request.auth.uid || isStaff());
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
     }
-    match /{collection}/{document} {
+    match /announcements/{document} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole(['admin', 'academic', 'administrative', 'finance']);
+    }
+    match /events/{document} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole(['admin', 'administrative', 'society_manager']);
+    }
+    match /societies/{document} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole(['admin', 'society_manager']);
+    }
+    match /rooms/{document} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole(['admin', 'facilities']);
+    }
+    match /facilityReports/{document} {
+      allow read: if signedIn() && (resource.data.reportedBy == request.auth.uid || isStaff());
+      allow create: if signedIn() && request.resource.data.reportedBy == request.auth.uid;
+      allow update, delete: if hasRole(['admin', 'facilities']);
+    }
+    match /lostFound/{document} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.reportedBy == request.auth.uid;
-      allow update, delete: if isStaff();
+      allow update, delete: if hasRole(['admin', 'facilities']) || (signedIn() && resource.data.reportedBy == request.auth.uid);
+    }
+    match /feedback/{document} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+    match /supportRequests/{document} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+    match /{collection}/{document} {
+      allow read: if signedIn();
+      allow write: if false;
     }
   }
 }
