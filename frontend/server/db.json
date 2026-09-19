@@ -1,0 +1,167 @@
+{
+  "users": [
+    {
+      "uid": "demo-student",
+      "email": "student@ucl.lk",
+      "passwordHash": "44555d341fdebce080a8b1c856f2fa9c:1b571d113bdbac5731fb8e34cd3cbede44f6e9a1ca0620da3c5bfcbe2f4698bfd0934281593b8b132e140a336e79330fe9b0d37e341e4398a7bb4f2d0c6848e1",
+      "displayName": "Demo Student",
+      "role": "STUDENT",
+      "department": null,
+      "faculty": "Computing",
+      "programme": "BSc Computer Science",
+      "yearGroup": 2,
+      "createdAt": "2026-09-19T07:59:44.710Z",
+      "updatedAt": "2026-09-19T07:59:44.711Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-academic",
+      "email": "academic@ucl.lk",
+      "passwordHash": "1d2b262a02b964b481ece563c920fc9c:e30c783966f926f9a18af381ba24debb93e4ef93de10cc96ce1d0371601e642b215fdd3ee28c53bc0e776fcabef96f552bf240daea07bd26c97d9b99d052d8fe",
+      "displayName": "Demo Academic",
+      "role": "ACADEMIC",
+      "department": "ACADEMIC",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.753Z",
+      "updatedAt": "2026-09-19T07:59:44.753Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-society-manager",
+      "email": "society.manager@ucl.lk",
+      "passwordHash": "1362dfb932ec9286a2cf6899e30ee6af:f1145c00960bc38d985906e4a9dca34614be3c6b5f332d064bef8852f1604092686365e75b4d44d973c290d83e3c3070aad2f82a3f2113e6a7a16cc680f7f2f1",
+      "displayName": "Demo Society Manager",
+      "role": "SOCIETY_MANAGER",
+      "department": "SOCIETY",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.797Z",
+      "updatedAt": "2026-09-19T07:59:44.797Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-finance",
+      "email": "finance@ucl.lk",
+      "passwordHash": "f056e55c8497c1dcdf9ea0f6ae86117f:f875e03b07b1f888ac7787ad9d5ae530eaa9d3434cb910a8e0dd16d368e47e494d776f8dbe0ec7399e74c47d3516c10ea4c9cb68b5d8cba1839865b80d3dc967",
+      "displayName": "Demo Finance Officer",
+      "role": "FINANCE",
+      "department": "FINANCE",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.839Z",
+      "updatedAt": "2026-09-19T07:59:44.839Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-administrative",
+      "email": "administrative@ucl.lk",
+      "passwordHash": "53cde6511cf8dd93945b332b0339a034:cbb9c8932f98b18c5b04b5be77a25a5e4e0b219fc90e84891b34c1b7eb0582d210aa433a471b724a6a9f2f3c2f02b1580245e9dfeef32fc0cddb83bb4f92e5a0",
+      "displayName": "Demo Administrative Officer",
+      "role": "ADMINISTRATIVE",
+      "department": "ADMINISTRATIVE",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.879Z",
+      "updatedAt": "2026-09-19T07:59:44.879Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-facilities",
+      "email": "facilities@ucl.lk",
+      "passwordHash": "d2a1bfb2937199da1c52c78d4e2aeb81:0a0df3146159e53531af9117d5c2cdb69256042aeff44b11e9fca8731380f57baf0cbbb0078c18f4c7e33a71bd4f6c6b8837a89bd9b28082681bd7c56e165c1c",
+      "displayName": "Demo Facilities Officer",
+      "role": "FACILITIES",
+      "department": "FACILITIES",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.919Z",
+      "updatedAt": "2026-09-19T07:59:44.919Z",
+      "isActive": true
+    },
+    {
+      "uid": "demo-admin",
+      "email": "admin@ucl.lk",
+      "passwordHash": "2a40b67ad0cebb59458d440d18659eea:dc487c613c2f9eb4bc3f9bb4d6aa0447ba726b8109529de4cd4842ab642af14c3cbbfa616e34827d5225816dd2f9bd7fd2f2daf83ef01a8ccf2069193c540acc",
+      "displayName": "Demo Administrator",
+      "role": "ADMIN",
+      "department": "ADMINISTRATIVE",
+      "faculty": null,
+      "programme": null,
+      "yearGroup": null,
+      "createdAt": "2026-09-19T07:59:44.960Z",
+      "updatedAt": "2026-09-19T07:59:44.960Z",
+      "isActive": true
+    },
+    {
+      "uid": "1c287a91-52e8-4686-8f2b-13d07096e343",
+      "email": "new.student.1789804837@ucl.lk",
+      "passwordHash": "51ac0f25b664a00e0f3891275880c547:833e12123a638792d067cf5cbf090473927127452988a0511c33bd4ab84fbfc69efb6afc526c160c02df2149bda0e57bc7d998e9c8f5ad2500ea1f33c2a89d28",
+      "displayName": "New Local Student",
+      "role": "STUDENT",
+      "staffDepartment": null,
+      "faculty": "Computing",
+      "programme": "BSc Computer Science",
+      "yearGroup": 1,
+      "createdAt": "2026-09-19T08:00:37.946Z",
+      "updatedAt": "2026-09-19T08:00:37.947Z",
+      "isActive": true
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room-a",
+      "name": "Study Room A",
+      "building": "Learning Commons",
+      "capacity": 6,
+      "features": [
+        "Display",
+        "Whiteboard",
+        "Power"
+      ]
+    },
+    {
+      "id": "room-lab-2",
+      "name": "Collaboration Lab 2",
+      "building": "Innovation Wing",
+      "capacity": 12,
+      "features": [
+        "Display",
+        "Video call",
+        "Power"
+      ]
+    },
+    {
+      "id": "room-seminar-4",
+      "name": "Seminar Room 4",
+      "building": "Academic Block",
+      "capacity": 24,
+      "features": [
+        "Projector",
+        "Whiteboard",
+        "Accessible"
+      ]
+    }
+  ],
+  "roomBookings": [],
+  "eventInterests": [],
+  "societyInterests": [
+    {
+      "contentItemId": 22,
+      "studentId": "demo-admin",
+      "studentName": "Demo Administrator",
+      "message": null,
+      "id": "81a40df9-96a7-4582-a1b9-75af276facd5",
+      "createdAt": "2026-09-19T09:19:21.271Z"
+    }
+  ],
+  "lostFoundItems": [],
+  "academicSupportRequests": [],
+  "feedback": [],
+  "facilityIssues": []
+}

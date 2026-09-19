@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { hasPermission } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { BookingsTab } from './tabs/BookingsTab'
 import { SupportRequestsTab } from './tabs/SupportRequestsTab'
@@ -7,12 +9,15 @@ import { FeedbackTab } from './tabs/FeedbackTab'
 import { FacilityIssuesTab } from './tabs/FacilityIssuesTab'
 import { RoomsTab } from './tabs/RoomsTab'
 
-const TABS = ['Room Bookings', 'Academic Support', 'Feedback', 'Facility Issues', 'Rooms'] as const
+const TABS = ['Room Bookings', 'Academic Support', 'Feedback', 'Facility Issues', 'Rooms', 'Content'] as const
 type Tab = (typeof TABS)[number]
 
 export function StaffConsolePage() {
   const { profile } = useAuth()
-  const [tab, setTab] = useState<Tab>('Room Bookings')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const initialTab = requestedTab === 'rooms' ? 'Rooms' : requestedTab === 'content' ? 'Content' : 'Room Bookings'
+  const [tab, setTab] = useState<Tab | 'Content'>(initialTab)
 
   const STRAPI_URL = import.meta.env.VITE_STRAPI_URL ?? 'http://localhost:1337'
 
@@ -32,10 +37,10 @@ export function StaffConsolePage() {
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200">
-        {TABS.map((t) => (
+        {TABS.filter((t) => t !== 'Rooms' || profile?.role === 'ADMIN' || hasPermission(profile?.role, 'room:manage')).filter((t) => t !== 'Academic Support' || profile?.role === 'ADMIN' || hasPermission(profile?.role, 'support:manage')).filter((t) => t !== 'Facility Issues' || profile?.role === 'ADMIN' || hasPermission(profile?.role, 'lostfound:manage')).filter((t) => t !== 'Content' || profile?.role !== 'STUDENT').map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); setSearchParams(t === 'Rooms' ? { tab: 'rooms' } : {}) }}
             className={`border-b-2 px-3 py-2 text-sm font-medium ${
               tab === t ? 'border-ucl-blue text-ucl-blue' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
@@ -50,6 +55,7 @@ export function StaffConsolePage() {
       {tab === 'Feedback' && <FeedbackTab />}
       {tab === 'Facility Issues' && <FacilityIssuesTab />}
       {tab === 'Rooms' && <RoomsTab />}
+      {tab === 'Content' && <div className="rounded-2xl border border-[#e8e8ea] bg-white p-6 text-sm text-[#6e7077]">Content publishing is managed in the Strapi CMS. Use the CMS admin link above to update announcements, events, FAQs and campus services.</div>}
     </div>
   )
 }

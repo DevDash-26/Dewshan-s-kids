@@ -2,7 +2,7 @@ import type { ContentItem, UserProfile } from '../types/models'
 import { CATEGORY_LABELS } from './categoryMeta'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_MODEL = 'gemini-flash-latest'
 
 export interface AiRoute {
   label: string
@@ -177,10 +177,10 @@ Give a short, direct, friendly answer (max 4 sentences).`
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_API_KEY },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       },
     )

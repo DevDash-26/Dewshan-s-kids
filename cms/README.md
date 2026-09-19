@@ -12,6 +12,8 @@ npm run develop
 yarn develop
 ```
 
+The repository includes a local ignored `.env` with SQLite and session keys for development. On first successful boot, `src/index.ts` creates the demo content items automatically. The admin panel is available at `http://localhost:1337/admin`.
+
 ### `start`
 
 Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
