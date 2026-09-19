@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { GoogleGenAI } = require('@google/genai');
 const { seedData } = require('./data');
 
 const app = express();
@@ -304,7 +305,20 @@ app.get('/api/faqs', requireAuth, (req, res) => {
 });
 
 app.get('/api/support', requireAuth, (req, res) => {
-  res.json({ resources: state.supportResources, jobs: state.jobOpportunities });
+  res.json({
+    resources: state.supportResources,
+    jobs: state.jobOpportunities,
+    serviceInformation: state.serviceInformation,
+    facilityIssues: state.facilityIssues
+  });
+});
+
+app.get('/api/service-information', requireAuth, (req, res) => {
+  res.json({ items: state.serviceInformation });
+});
+
+app.get('/api/feedback', requireAuth, (req, res) => {
+  res.json({ items: state.feedback });
 });
 
 app.post('/api/feedback', requireAuth, (req, res) => {
@@ -353,44 +367,104 @@ app.post('/api/facility-issues', requireAuth, (req, res) => {
   res.status(201).json({ issue });
 });
 
-app.post('/api/ai', requireAuth, (req, res) => {
+async function buildGroundedAnswer(question) {
+  const q = String(question).toLowerCase();
+  const fallback = {
+    answer: 'I can help you with campus services, events, academic dates, and support resources.',
+    suggestions: ['Browse the dashboard', 'Search events', 'View student support'],
+    sources: []
+  };
+
+  if (q.includes('event') || q.includes('upcoming')) {
+    return {
+      ...fallback,
+      answer: 'The next campus events are the Tech Career Forum on 2026-09-25, Cultural Festival Night on 2026-09-27, and the AI in Education guest lecture on 2026-09-30.',
+      suggestions: ['View all events', 'Register interest in a session'],
+      sources: ['events']
+    };
+  }
+
+  if (q.includes('exam') || q.includes('calendar')) {
+    return {
+      ...fallback,
+      answer: 'The key academic dates include the add/drop period on 2026-09-24, the mid-semester break on 2026-10-15, and final exams from 2026-11-05.',
+      suggestions: ['Open academic calendar', 'Check important deadlines'],
+      sources: ['academic-calendar']
+    };
+  }
+
+  if (q.includes('lost') || q.includes('found')) {
+    return {
+      ...fallback,
+      answer: 'You can submit a Lost & Found report in the campus services section. Students and staff can log items, track status, and search for updates.',
+      suggestions: ['Report an item', 'Browse lost & found'],
+      sources: ['lost-found']
+    };
+  }
+
+  if (q.includes('room') || q.includes('book')) {
+    return {
+      ...fallback,
+      answer: 'Room requests are handled through the Classroom Booking flow. Pick a date, view available spaces, and submit a request. Conflicting bookings are blocked automatically.',
+      suggestions: ['Check room availability', 'Submit a room request'],
+      sources: ['rooms']
+    };
+  }
+
+  if (q.includes('counselling') || q.includes('wellbeing') || q.includes('support')) {
+    return {
+      ...fallback,
+      answer: 'The student counselling and wellbeing team is available via the Student Support resources section, which also lists academic mentoring and IT support contacts.',
+      suggestions: ['View support resources', 'Request mentoring'],
+      sources: ['support']
+    };
+  }
+
+  if (q.includes('library') || q.includes('printing') || q.includes('dining')) {
+    return {
+      ...fallback,
+      answer: 'Library hours, printing services and dining information are all available in the service information and support sections of UCL ONE.',
+      suggestions: ['Open service information', 'Search library details'],
+      sources: ['service-information']
+    };
+  }
+
+  return fallback;
+}
+
+app.post('/api/ai', requireAuth, async (req, res) => {
   const { question } = req.body || {};
   if (!question || !String(question).trim()) {
     return res.status(400).json({ message: 'Please enter a valid question.' });
   }
 
-  const q = String(question).toLowerCase();
-  let answer = 'I can help you with campus services, events, academic dates, and support resources.';
-  let suggestions = ['Browse the dashboard', 'Search events', 'View student support'];
-  const sources = [];
+  const trimmed = String(question).trim();
+  const geminiKey = process.env.GEMINI_API_KEY || '';
 
-  if (q.includes('event') || q.includes('upcoming')) {
-    answer = 'The next campus events are the Tech Career Forum on 2026-09-25, Cultural Festival Night on 2026-09-27, and the AI in Education guest lecture on 2026-09-30.';
-    suggestions = ['View all events', 'Register interest in a session'];
-    sources.push('events');
-  } else if (q.includes('exam') || q.includes('calendar')) {
-    answer = 'The key academic dates include the add/drop period on 2026-09-24, the mid-semester break on 2026-10-15, and final exams from 2026-11-05.';
-    suggestions = ['Open academic calendar', 'Check important deadlines'];
-    sources.push('academic-calendar');
-  } else if (q.includes('lost') || q.includes('found')) {
-    answer = 'You can submit a Lost & Found report in the campus services section. Students and staff can log items, track status, and search for updates.';
-    suggestions = ['Report an item', 'Browse lost & found'];
-    sources.push('lost-found');
-  } else if (q.includes('room') || q.includes('book')) {
-    answer = 'Room requests are handled through the Classroom Booking flow. Pick a date, view available spaces, and submit a request. Conflicting bookings are blocked automatically.';
-    suggestions = ['Check room availability', 'Submit a room request'];
-    sources.push('rooms');
-  } else if (q.includes('counselling') || q.includes('wellbeing') || q.includes('support')) {
-    answer = 'The student counselling and wellbeing team is available via the Student Support resources section, which also lists academic mentoring and IT support contacts.';
-    suggestions = ['View support resources', 'Request mentoring'];
-    sources.push('support');
-  } else if (q.includes('library') || q.includes('printing') || q.includes('dining')) {
-    answer = 'Library hours, printing services and dining information are all available in the service information and support sections of UCL ONE.';
-    suggestions = ['Open service information', 'Search library details'];
-    sources.push('service-information');
+  if (geminiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const prompt = `You are the UCL ONE campus assistant. Use only the following internal campus facts: ${JSON.stringify({
+        announcements: state.announcements.slice(0, 4),
+        events: state.events.slice(0, 4),
+        supportResources: state.supportResources.slice(0, 4),
+        academicCalendar: state.academicCalendar.slice(0, 4),
+        faqs: state.faqs.slice(0, 4)
+      })}. Answer this user question clearly and concisely, then propose 2 or 3 follow-up actions. User question: ${trimmed}`;
+
+      const result = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+      const text = String(result.text || '').trim();
+
+      if (text) {
+        return res.json({ answer: text, suggestions: ['Open dashboard', 'View support resources', 'Search campus info'], sources: ['gemini', 'campus-data'], grounded: true, question: trimmed, mode: 'gemini' });
+      }
+    } catch (error) {
+      console.warn('Gemini request failed; falling back to local grounded response.', error.message);
+    }
   }
 
-  res.json({ answer, suggestions, sources, grounded: true, question });
+  const grounded = await buildGroundedAnswer(trimmed);
+  return res.json({ ...grounded, question: trimmed, grounded: true, mode: 'local-fallback' });
 });
 
 app.get('/api/health-check', requireAuth, (req, res) => {
