@@ -68,10 +68,11 @@ The repeatable seed uses the Firebase Admin SDK and a service-account file, so i
 
 ```powershell
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\firebase-service-account.json"
+$env:DEMO_PASSWORD="UclDemo2026!"
 npm run seed
 ```
 
-The script creates deterministic demo users and content across announcements, events, societies, FAQs, jobs, classrooms, finance, wellbeing, dining, printing, library and student-life collections. It uses merge writes and does not create passwords. Set demo passwords or send reset emails from Firebase Console. Never point this script at production without reviewing the IDs first.
+The script creates deterministic demo users and content across announcements, events, societies, FAQs, jobs, classrooms, finance, wellbeing, dining, printing, library and student-life collections. It creates or resets the Firebase Auth password for each demo account, but never writes the password to Firestore. `DEMO_PASSWORD` defaults to `UclDemo2026!` for local demonstrations. Never point this script at production without reviewing the IDs first.
 
 ## Strapi setup
 
@@ -91,9 +92,21 @@ VITE_GEMINI_API_KEY=YOUR_KEY_HERE
 
 The browser integration is intentionally simple for this hackathon. A production deployment should proxy Gemini through a server-side function with rate limiting and authenticated access.
 
-## Demo roles
+## Demo roles and login credentials
 
-The seed creates `student@ucl.lk`, `academic@ucl.lk`, `society.manager@ucl.lk`, `finance@ucl.lk`, `administrative@ucl.lk`, `facilities@ucl.lk` and `admin@ucl.lk`. Assign temporary passwords only through Firebase Console or a private Admin SDK workflow; do not commit them.
+After running the seed command, use the following accounts. The password is intentionally shared for a short-lived local/demo project only:
+
+| Role | Email | Password | Main protected view |
+|---|---|---|---|
+| Student | `student@ucl.lk` | `UclDemo2026!` | Student dashboard |
+| Academic | `academic@ucl.lk` | `UclDemo2026!` | Academic Management |
+| Society manager | `society.manager@ucl.lk` | `UclDemo2026!` | Society Management |
+| Finance | `finance@ucl.lk` | `UclDemo2026!` | Finance Management |
+| Administrative | `administrative@ucl.lk` | `UclDemo2026!` | Administration |
+| Facilities | `facilities@ucl.lk` | `UclDemo2026!` | Facilities Management |
+| Admin | `admin@ucl.lk` | `UclDemo2026!` | Admin Dashboard and Users & Roles |
+
+These are demo credentials, not production secrets. Change or delete them before a public deployment.
 
 ## Validation and deployment
 

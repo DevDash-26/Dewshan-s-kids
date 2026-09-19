@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { getApps, initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -8,10 +8,12 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS || !existsSync(process.env.GOOGL
   process.exit(1);
 }
 
-const app = getApps()[0] || initializeApp({ credential: cert(JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS)) });
+const serviceAccount = JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+const app = getApps()[0] || initializeApp({ credential: cert(serviceAccount) });
 const auth = getAuth(app);
 const db = getFirestore(app);
 const now = FieldValue.serverTimestamp();
+const demoPassword = process.env.DEMO_PASSWORD || 'UclDemo2026!';
 const demoUsers = [
   ['demo-student', 'student@ucl.lk', 'Demo Student', 'student'],
   ['demo-academic', 'academic@ucl.lk', 'Demo Academic', 'academic'],
@@ -65,11 +67,12 @@ const content = {
 
 for (const [id, email, displayName, role] of demoUsers) {
   let user;
-  try { user = await auth.getUserByEmail(email); } catch (error) { if (error.code !== 'auth/user-not-found') throw error; user = await auth.createUser({ email, displayName, emailVerified: false, disabled: false }); }
+  try { user = await auth.getUserByEmail(email); } catch (error) { if (error.code !== 'auth/user-not-found') throw error; user = await auth.createUser({ email, password: demoPassword, displayName, emailVerified: false, disabled: false }); }
+  user = await auth.updateUser(user.uid, { password: demoPassword, displayName, disabled: false });
   await db.collection('users').doc(user.uid).set({ uid: user.uid, email, displayName, name: displayName, role, isActive: true, createdAt: now, updatedAt: now }, { merge: true });
 }
 
 for (const [collection, records] of Object.entries(content)) {
   for (const [id, data] of records) await db.collection(collection).doc(id).set({ ...data, demo: true, createdAt: now, updatedAt: now }, { merge: true });
 }
-console.log('Seeded deterministic UCL Connect demo users and content. No passwords were created; use password reset or set credentials in Firebase Auth for demos.');
+console.log(`Seeded deterministic UCL Connect demo users and content. Demo password: ${demoPassword}`);
