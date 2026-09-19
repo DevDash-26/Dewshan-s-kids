@@ -1,14 +1,12 @@
 # UCL ONE — frontend
 
-React + TypeScript + Vite + Tailwind CSS app. See the [repository root README](../README.md) for setup, environment variables, demo credentials, and architecture — this file is intentionally not duplicated here.
+React + TypeScript + Vite + Tailwind CSS app backed by the local JSON API in `server/`. See the [repository root README](../README.md) for setup, demo credentials, and architecture.
 
 Quick reference:
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm test         # unit tests
-npm run test:rules   # Firestore rules tests (needs the Firestore emulator running)
-npm run test:auth    # Auth tests (needs the Auth emulator running)
-npm run build     # production build
+npm run dev:all  # local API + Vite frontend
+npm run test     # unit tests
+npm run build    # production build
 ```

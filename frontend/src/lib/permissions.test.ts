@@ -8,11 +8,11 @@ describe('permissions', () => {
     expect(hasPermission('STUDENT', 'booking:decide')).toBe(false)
   })
 
-  it('grants staff content and booking permissions but not room or user management', () => {
-    expect(hasPermission('STAFF', 'content:manage')).toBe(true)
-    expect(hasPermission('STAFF', 'booking:decide')).toBe(true)
-    expect(hasPermission('STAFF', 'room:manage')).toBe(false)
-    expect(hasPermission('STAFF', 'user:manage')).toBe(false)
+  it('grants domain permissions only to the matching staff role', () => {
+    expect(hasPermission('ACADEMIC', 'support:manage')).toBe(true)
+    expect(hasPermission('ACADEMIC', 'room:manage')).toBe(false)
+    expect(hasPermission('FACILITIES', 'room:manage')).toBe(true)
+    expect(hasPermission('FINANCE', 'event:manage')).toBe(false)
   })
 
   it('grants admin every permission', () => {
@@ -26,7 +26,7 @@ describe('permissions', () => {
 
   it('isStaffOrAdmin distinguishes staff/admin from students', () => {
     expect(isStaffOrAdmin('STUDENT')).toBe(false)
-    expect(isStaffOrAdmin('STAFF')).toBe(true)
+    expect(isStaffOrAdmin('ACADEMIC')).toBe(true)
     expect(isStaffOrAdmin('ADMIN')).toBe(true)
     expect(isStaffOrAdmin(undefined)).toBe(false)
   })

@@ -1,9 +1,8 @@
 import type { Role } from '../types/models'
 
 // Centralized authorization map. Server-side enforcement lives in
-// firestore.rules — this module is the single source of truth the UI reads
-// from, so a permission is never "hidden" in one screen but reachable from
-// another. See NFR4 / BR12.
+// The local backend repeats these checks server-side; this map keeps navigation
+// and route visibility consistent with the API authorization boundary.
 export type Permission =
   | 'content:manage'
   | 'announcement:publish'
@@ -17,7 +16,11 @@ export type Permission =
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   STUDENT: [],
-  STAFF: ['content:manage', 'announcement:publish', 'event:manage', 'society:manage', 'lostfound:manage', 'support:manage', 'booking:decide'],
+  ACADEMIC: ['content:manage', 'announcement:publish', 'support:manage', 'booking:decide'],
+  SOCIETY_MANAGER: ['content:manage', 'event:manage', 'society:manage'],
+  FINANCE: ['content:manage', 'announcement:publish'],
+  ADMINISTRATIVE: ['content:manage', 'announcement:publish', 'event:manage', 'booking:decide'],
+  FACILITIES: ['content:manage', 'room:manage', 'lostfound:manage', 'booking:decide'],
   ADMIN: [
     'content:manage',
     'announcement:publish',
@@ -37,5 +40,5 @@ export function hasPermission(role: Role | undefined, permission: Permission): b
 }
 
 export function isStaffOrAdmin(role: Role | undefined): boolean {
-  return role === 'STAFF' || role === 'ADMIN'
+  return role !== undefined && role !== 'STUDENT'
 }

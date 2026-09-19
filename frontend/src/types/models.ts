@@ -1,22 +1,22 @@
 // Core domain types for UCL ONE.
 // Content that is informational (announcements, events, societies, FAQ, etc.) is
 // managed in Strapi as a single reusable `ContentItem` shape (see /cms).
-// Content that is transactional/user-generated lives in Firestore.
+// Content that is transactional/user-generated lives in the local API database.
 
-export type Role = 'STUDENT' | 'STAFF' | 'ADMIN'
-
-export type StaffDepartment = 'ACADEMIC' | 'SOCIETY' | 'FINANCE' | 'ADMINISTRATIVE' | null
+export type Role = 'STUDENT' | 'ACADEMIC' | 'SOCIETY_MANAGER' | 'FINANCE' | 'ADMINISTRATIVE' | 'FACILITIES' | 'ADMIN'
 
 export interface UserProfile {
   uid: string
   email: string
   displayName: string
   role: Role
-  staffDepartment: StaffDepartment
+  department?: string | null
   faculty: string | null
   programme: string | null
   yearGroup: number | null
   createdAt: string
+  updatedAt?: string
+  isActive?: boolean
 }
 
 // Mirrors the `category` enum on the Strapi `content-item` content type.

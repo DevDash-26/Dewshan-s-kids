@@ -1,0 +1,10 @@
+# UCL Connect local demo accounts
+# Passwords are hashed in db.json after seeding; use these only for local demos.
+# Format: email | password | displayName | role | department
+student@ucl.lk | UclDemo2026! | Demo Student | STUDENT | 
+academic@ucl.lk | UclDemo2026! | Demo Academic | ACADEMIC | ACADEMIC
+society.manager@ucl.lk | UclDemo2026! | Demo Society Manager | SOCIETY_MANAGER | SOCIETY
+finance@ucl.lk | UclDemo2026! | Demo Finance Officer | FINANCE | FINANCE
+administrative@ucl.lk | UclDemo2026! | Demo Administrative Officer | ADMINISTRATIVE | ADMINISTRATIVE
+facilities@ucl.lk | UclDemo2026! | Demo Facilities Officer | FACILITIES | FACILITIES
+admin@ucl.lk | UclDemo2026! | Demo Administrator | ADMIN | ADMINISTRATIVE

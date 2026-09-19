@@ -5,13 +5,13 @@ import { useAuth } from '../../context/AuthContext'
 import { Button, FormError, Input, Label } from '../../components/ui/Primitives'
 
 export function LoginPage() {
-  const { firebaseUser, login, error, clearError } = useAuth()
+  const { user, login, error, clearError } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  if (firebaseUser) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

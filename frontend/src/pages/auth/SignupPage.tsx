@@ -6,7 +6,7 @@ import { Button, FormError, Input, Label, Select } from '../../components/ui/Pri
 import { FACULTIES, PROGRAMMES_BY_FACULTY, YEAR_GROUPS } from '../../lib/academicOptions'
 
 export function SignupPage() {
-  const { firebaseUser, signup, error, clearError } = useAuth()
+  const { user, signup, error, clearError } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
@@ -16,7 +16,7 @@ export function SignupPage() {
   const [yearGroup, setYearGroup] = useState<number>(1)
   const [submitting, setSubmitting] = useState(false)
 
-  if (firebaseUser) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

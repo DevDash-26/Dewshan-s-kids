@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { doc, setDoc } from 'firebase/firestore'
-import { db } from '../../../lib/firebase'
+import { createCollectionItem } from '../../../lib/api'
 import { watchRooms } from '../../../lib/collections'
 import type { Room } from '../../../types/models'
 import { useAuth } from '../../../context/AuthContext'
@@ -35,7 +34,7 @@ export function RoomsTab() {
     setError(null)
     try {
       const id = name.trim().toLowerCase().replace(/\s+/g, '-')
-      await setDoc(doc(db, 'rooms', id), { name: name.trim(), building: building.trim(), capacity, features: [] })
+      await createCollectionItem<Room>('rooms', { id, name: name.trim(), building: building.trim(), capacity, features: [] })
       setName('')
       setBuilding('')
       setCapacity(10)

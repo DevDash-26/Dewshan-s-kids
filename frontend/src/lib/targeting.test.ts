@@ -31,7 +31,7 @@ const student: UserProfile = {
   email: 's@ucl.lk',
   displayName: 'Student One',
   role: 'STUDENT',
-  staffDepartment: null,
+  department: null,
   faculty: 'Faculty of Computing',
   programme: 'BSc Software Engineering',
   yearGroup: 2,

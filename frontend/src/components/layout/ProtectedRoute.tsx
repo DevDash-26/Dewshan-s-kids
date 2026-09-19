@@ -5,10 +5,10 @@ import { isStaffOrAdmin } from '../../lib/permissions'
 import { Spinner } from '../ui/Feedback'
 
 export function ProtectedRoute({ children, staffOnly = false }: { children: ReactNode; staffOnly?: boolean }) {
-  const { firebaseUser, profile, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
 
   if (loading) return <Spinner label="Loading your session…" />
-  if (!firebaseUser) return <Navigate to="/login" replace />
+  if (!user || !profile) return <Navigate to="/login" replace />
   if (staffOnly && !isStaffOrAdmin(profile?.role)) return <Navigate to="/" replace />
 
   return <>{children}</>
