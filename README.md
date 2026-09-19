@@ -18,11 +18,11 @@ UCL ONE is a unified campus platform, not a bundle of unrelated mini-apps. A sin
 - Classroom booking with real-time availability checking and conflict detection
 - Lost & Found, academic support requests, facility issue reporting, feedback — all with staff triage
 - AI Assistant grounded in the platform's own content, with a transparent, functional fallback when no AI provider key is configured
-- Server-side RBAC (STUDENT / STAFF / ADMIN) enforced by Firestore Security Rules, not just hidden UI
+- Server-side RBAC (STUDENT / STAFF / ADMIN, plus per-department staff scopes — academic, society, administrative) enforced by Firestore Security Rules, not just hidden UI
 
 ## 4. Requirements Covered
 
-See [`/docs/requirements-traceability.md`](docs/requirements-traceability.md) for the full BR1–BR33 / NFR1–NFR6 mapping. Summary: 31/33 business requirements complete, 2 partial (documented), all 6 non-functional requirements addressed.
+See [`/docs/requirements-traceability.md`](docs/requirements-traceability.md) for the full BR1–BR33 / NFR1–NFR6 mapping, independently re-audited against the running code. Summary: 29/33 business requirements complete, 2 partial (BR24, BR27, documented), 1 partial specifically because its AI call has never executed in this environment (BR33 — see § 13), 3/6 non-functional requirements complete (NFR4, NFR5, NFR6), 3/6 partial for reasons inherent to a hackathon-scope prototype (NFR1, NFR2, NFR3).
 
 ## 5. Architecture
 
@@ -37,9 +37,9 @@ report/     Full technical report
 
 **Two data sources, one app:**
 - **Strapi** owns *informational* content — the 22 categories in BR1–BR33 that are staff/admin-authored (announcements, events, societies, FAQs, calendar, support resources, etc.). Public read access; writes require a Strapi admin login.
-- **Firestore** owns *transactional, per-user* data — room bookings, event/society interest, lost & found reports, support requests, feedback, facility issues, and the user profile (role, faculty, programme, year group). Every collection has its own Security Rule; see `firebase/firestore.rules`.
+- **Firestore** owns *transactional, per-user* data — room bookings, event/society interest, lost & found reports, support requests, feedback, facility issues, and the user profile (role, faculty, programme, year group, **staff department**). Every collection has its own Security Rule; see `firebase/firestore.rules`.
 
-This split means BR2–BR32 (22 information categories) are covered by **one** Strapi content type instead of 22 bespoke backends, while the seven required action workflows (BR4, BR6, BR7, BR8, BR9, BR17, BR21) get real per-collection authorization.
+This split means BR2–BR32 (22 information categories) are covered by **one** Strapi content type instead of 22 bespoke backends, while the seven required action workflows (BR4, BR6, BR7, BR8, BR9, BR17, BR21) get real per-collection authorization — including BR12's department differentiation: a STAFF account's `staffDepartment` (ACADEMIC / SOCIETY / ADMINISTRATIVE / FINANCE) gates exactly which of those collections they can act on, enforced in `firestore.rules`, not just in the UI.
 
 ## 6. Technology Stack
 
@@ -49,7 +49,7 @@ This split means BR2–BR32 (22 information categories) are covered by **one** S
 | Auth & data | Firebase Authentication (email/password), Cloud Firestore | Google Firebase, free tier / local emulator |
 | CMS | Strapi 5 (Community edition), SQLite | Open-source, self-hosted |
 | AI | Google Gemini API (`gemini-2.0-flash`) via direct REST call, with a deterministic keyword-search fallback | Requires a Google AI Studio API key (optional — app works without one) |
-| Testing | Vitest, Testing Library, `@firebase/rules-unit-testing`, Firebase Local Emulator Suite | Open-source |
+| Testing | Vitest, `@testing-library/jest-dom`, `@firebase/rules-unit-testing`, Playwright, Firebase Local Emulator Suite | Open-source |
 
 No AI-generated code was represented as hand-written, and no part of the *design decisions* (data model, RBAC model, category taxonomy) was produced by an AI without human direction — see the team contribution section below.
 
@@ -97,15 +97,21 @@ Firestore is schemaless — collections are created on first write. `firebase/fi
 ## 10. Seed Instructions
 
 - **Content (Strapi):** runs automatically on first `npm run develop` if the `content-items` table is empty (see `cms/src/index.ts`). 34 invented demo items across all 22 categories.
-- **Demo accounts + rooms (Firebase):** run `node scripts/seed-emulator.mjs` while the emulators are running (see step 5 above). This script refuses to run against anything except the emulator.
+- **Demo accounts + rooms (Firebase):** run `node scripts/seed-emulator.mjs` while the emulators are running (see step 5 above). The script reads `VITE_FIREBASE_PROJECT_ID` from `frontend/.env` automatically, so it always seeds whatever project the app is actually configured for (defaults to `ucl-one-demo` if that file isn't found). It refuses to run unless both emulator host env vars resolve to a loopback address — it must never be pointed at a real project, since it creates well-known demo passwords.
+
+  If you change `frontend/.env`'s project id after already seeding, re-run this script — a mismatch here was previously a real bug (see `docs/requirements-traceability.md` NFR4/BR12 history): the app would silently show `profile: null` with no error, since a missing Firestore document isn't a permissions failure.
 
 ## 11. Demo Credentials
 
-| Role | Email | Password |
-|---|---|---|
-| Student | `student.demo@uclone.lk` | `Demo123!` |
-| Staff | `staff.demo@uclone.lk` | `Demo123!` |
-| Admin | `admin.demo@uclone.lk` | `Demo123!` |
+| Role | Email | Password | Department |
+|---|---|---|---|
+| Student | `student.demo@uclone.lk` | `Demo123!` | — |
+| Staff | `staff.admin@uclone.lk` | `Demo123!` | ADMINISTRATIVE (room bookings, feedback, facility issues) |
+| Staff | `staff.academic@uclone.lk` | `Demo123!` | ACADEMIC (academic support requests) |
+| Staff | `staff.society@uclone.lk` | `Demo123!` | SOCIETY (society sign-up roster) |
+| Admin | `admin.demo@uclone.lk` | `Demo123!` | — (full access, all departments) |
+
+Log in as different staff accounts to see the Staff Console only show the tabs that account's department grants (BR12) — this is enforced server-side in `firestore.rules`, not just hidden in the UI.
 
 All demo data (accounts, content, rooms) is invented for this prototype — no real UCL staff, students, or data are used.
 
@@ -118,59 +124,67 @@ All demo data (accounts, content, rooms) is invented for this prototype — no r
 
 ```
 Student question → src/lib/ai.ts
-  → retrieveRelevantContent(): keyword-scored search over the same
-    content corpus Search & Discover uses (category-aware ranking,
-    date tie-breaking for events)
-  → if VITE_GEMINI_API_KEY is set: build a prompt that includes ONLY
-    the retrieved content, call Gemini, return its answer + the
-    sources used + suggested in-app routes
+  → retrieveRelevantContent(): whole-word, category-aware keyword
+    search over the same content corpus Search & Discover uses
+    (date tie-breaking for events)
+  → if VITE_GEMINI_API_KEY is set: send the persona + grounding rules
+    + retrieved content as Gemini's systemInstruction, and the raw
+    student question as the sole `user` turn — kept structurally
+    separate so the question can't as easily inject new instructions
+    into the same field as the rules ("ignore previous instructions…")
   → if no key, or the Gemini call fails: return the same retrieved
     sources directly as a deterministic answer, clearly labelled
     "(search fallback)" — never silently pretend to be AI-generated
 ```
 
-This was verified two ways: (1) automated tests (`src/lib/ai.test.ts`) exercise the fallback path with no key configured; (2) a full browser smoke test (see `/report/report.md` § Test Results) confirms the assistant answers "Are there any events this week?" with the three soonest actual events, not an unrelated keyword match.
+**Honest status: GEMINI NOT EXECUTED — FALLBACK VERIFIED.** `VITE_GEMINI_API_KEY` has been empty throughout this project's history. Every answer ever produced — across the original build, a forensic audit, and this fix pass — is the deterministic fallback, and every one of them correctly self-discloses that. This is stated plainly rather than left to blend into "AI-powered" language: the Gemini code path is written, reviewed, and structurally sound, but has zero execution evidence.
+
+What *is* verified: (1) automated tests (`src/lib/ai.test.ts`, 6 tests) exercise the fallback path, including regressions for two retrieval bugs a forensic audit found — "book" matching inside "textbook", and "week" matching inside "weekly" (fixed with whole-word matching); (2) a committed, reproducible browser test (`frontend/e2e/smoke.spec.ts`, run via `npm run test:e2e`) confirms the assistant answers a real question end-to-end with zero console errors; (3) manual testing against all 10 of the officially suggested test questions plus 3 adversarial ones (gibberish, SQL-injection-shaped text, a raw `<script>` tag) produced grounded, non-hallucinated, non-exploitable answers every time.
 
 ## 14. Security
 
 - Passwords: handled entirely by Firebase Authentication (never touched or stored by our code).
-- Authorization: enforced server-side by Firestore Security Rules — 22 automated tests run against the real Firestore emulator (`npm run test:rules`), not a mock.
-- Public signup can only ever create STUDENT accounts. STAFF/ADMIN accounts are provisioned out-of-band (seed script), because this repository is public and any client-embedded "staff signup code" would be visible to anyone reading the source.
-- No secrets are hard-coded; `.env` files are git-ignored (`.env.example` is committed).
-- See [`/docs/requirements-traceability.md`](docs/requirements-traceability.md) NFR4 for the one documented trade-off (booking-record read visibility).
+- Authorization: enforced server-side by Firestore Security Rules — 44+ automated tests run against the real Firestore emulator (`npm run test:rules`), not a mock, including department-boundary enforcement (BR12: a staff member outside the right department is rejected server-side, not just hidden from the UI).
+- The public Strapi content API is forced to `status=published` server-side regardless of what a caller requests — a prior version of this trusted a client-supplied query param and let anonymous requests read unpublished draft content; fixed and covered by a reproducible check (`cms/scripts/verify-public-api-security.mjs`).
+- Public signup can only ever create STUDENT accounts. STAFF/ADMIN accounts (and their department) are provisioned out-of-band (seed script), because this repository is public and any client-embedded "staff signup code" would be visible to anyone reading the source.
+- No secrets are hard-coded; `.env` files are git-ignored (`.env.example` is committed). Verified via `git grep` for API-key-shaped strings in tracked files.
+- See [`/docs/requirements-traceability.md`](docs/requirements-traceability.md) NFR4 for the two remaining documented trade-offs (booking-record read visibility, and the Gemini key being client-side if ever configured — there's no backend proxy in this architecture).
 
 ## 15. Testing
 
-Real, automated, currently-passing test evidence — 44 tests across four suites:
+Real, automated, currently-passing test evidence — 76+ tests across four suites, plus a committed end-to-end suite:
 
 | Suite | Command | Count | What it proves |
 |---|---|---|---|
-| Unit logic | `npm test` (in `frontend/`) | 19 | RBAC permission map, BR2 targeting/relevance sorting, BR8 time-overlap conflict detection, BR33 AI fallback behaviour |
-| Firestore rules | `npm run test:rules` | 22 | Real authorization enforcement against the live Firestore emulator — student/staff/admin boundaries on every collection, privilege-escalation rejection |
+| Unit logic | `npm test` (in `frontend/`) | 29 | RBAC/department permission map, BR2 targeting (filter, not just sort), BR8 time-overlap conflict detection, BR33 AI fallback behaviour incl. two retrieval-bug regressions |
+| Firestore rules + booking integration | `npm run test:rules` | 44 | Real authorization enforcement against the live Firestore emulator — student/staff/admin/department boundaries on every collection, privilege-escalation rejection, BR8's approval-time conflict transaction (no conflict / exact overlap / partial overlap / adjacent / different room / wrong department) |
 | Auth | `npm run test:auth` | 3 | Real Firebase Authentication against the live emulator — valid login, wrong password, unregistered email |
-| Manual E2E smoke test | Playwright, see report | 1 golden path | Login → dashboard → AI assistant → event interest → room booking → staff approval → student sees approval, zero console errors |
+| E2E smoke (Playwright) | `npm run test:e2e` | 1 golden path, 12 steps | Committed and reproducible from a clean clone (with emulators/Strapi/seed running) — login → search → dashboard → event interest → society join → room booking → lost & found → AI assistant → logout → staff approval, zero console errors |
 
-Run `npm test && npm run test:rules && npm run test:auth` inside `frontend/` (emulators must be running for the last two).
+Run `npm test && npm run test:rules && npm run test:auth && npm run test:e2e` inside `frontend/` (emulators + Strapi + seed must be running for the last three — see § 7).
 
 ## 16. Known Limitations
 
 - **BR24 (Sports booking) and BR27 (Textbook exchange):** visibility-only, see traceability doc for why.
-- **Room booking conflict detection is not atomic.** Two students could theoretically request the same slot within the same few hundred milliseconds; a production system would enforce this with a server-side transaction (Cloud Function), which was out of scope for the time available.
+- **Room booking approval is optimistic-concurrency-checked, not fully pessimistically locked.** `decideBooking` re-validates against every other APPROVED booking inside a Firestore transaction at commit time (closing the gap where two overlapping requests could both be approved with zero warning), but a booking created in the exact same instant, after the initial candidate query, is not covered. A production system would additionally want a server-side transaction boundary (Cloud Function) to close this fully.
 - **`roomBookings` read access is broader than ideal** (any signed-in user, not just the owner) because Firestore rejects "unsafe" list queries — documented in `firebase/firestore.rules`.
-- **No code-splitting**: the production bundle is a single ~875 KB JS file. Acceptable for a prototype; would be addressed with route-based `React.lazy` in a real deployment.
-- **AI Assistant runs without a live Gemini key in this evaluation environment.** The integration code is complete and was written against the real Gemini API; only the fallback path could be demonstrated without provisioning a paid/rate-limited external API key during the build window.
+- **BR12's FINANCE department has no dedicated Firestore-backed action.** Financial-support content lives entirely in the Strapi CMS, which has its own separate admin authentication — the underlying need is met through that mechanism, not this app's department system.
+- **AI Assistant has never executed a real Gemini call in this environment.** `VITE_GEMINI_API_KEY` has been empty throughout the project's history. See § 13 for exactly what is and isn't verified.
+- **The vendor JS bundle (~823 kB gzipped ~249 kB) is still large** even after route-level code splitting (§ NFR2) — it's mostly the Firebase SDK, used by nearly every route, so further reduction would mean removing functionality rather than just splitting it.
 
 ## 17. Future Improvements
 
-- Cloud Function-enforced atomic booking transactions
+- Cloud Function-enforced fully atomic booking transactions (closing the narrow remaining race window described above)
 - Student-authored textbook marketplace and sports-facility booking, reusing the room-booking pattern
+- A Cloud Function proxy for the Gemini API key, so it's never sent to the client
 - Push notifications (BR-adjacent: `notifications` collection already modelled in Firestore, not yet wired to a UI)
-- Code-splitting and a client-side cache (React Query) for NFR2
+- A client-side cache (React Query) for NFR2, on top of the code-splitting already done
 - Retry/offline handling for NFR3
+- A FINANCE-department Firestore-backed action, if a real one emerges (deliberately not invented for this build — see BR12 in the traceability doc)
 
 ## 18. Libraries / APIs Used and Disclosure
 
-React, TypeScript, Vite, Tailwind CSS, `react-router-dom`, `lucide-react`, `date-fns`, Firebase JS SDK, Firebase Admin SDK (seed script only), Strapi, Vitest, Testing Library, `@firebase/rules-unit-testing`, Google Gemini API. All are publicly available open-source packages or documented third-party APIs, disclosed here per the hackathon rules. AI assistance (Claude) was used as a coding aid during the build — see Team Contribution.
+React, TypeScript, Vite, Tailwind CSS, `react-router-dom`, `lucide-react`, Firebase JS SDK, Firebase Admin SDK (seed script only), Strapi, Vitest, `@testing-library/jest-dom`, `@firebase/rules-unit-testing`, Playwright (`@playwright/test`, committed E2E suite), Google Gemini API. All are publicly available open-source packages or documented third-party APIs, disclosed here per the hackathon rules. AI assistance (Claude) was used as a coding aid during the build — see Team Contribution.
 
 ## 19. Team Contribution
 

@@ -4,7 +4,9 @@
 
 ## 1. Executive Summary
 
-UCL ONE is a unified campus information and services platform built for Universal College Lanka in response to the DevDash'26 problem statement: students have no single trusted channel for campus information, relying instead on WhatsApp groups, notice boards, and word of mouth. Rather than building 20+ disconnected mini-features, we built one reusable content engine covering 22 information categories, plus seven purpose-built action workflows for the things students actually need to *do* (book a room, report a lost item, register interest in an event, and so on), all gated by real server-side role-based access control, and an AI assistant grounded in the platform's own data. 31 of 33 business requirements are fully implemented and verified; the remaining two are honestly documented as partial. 44 automated tests pass, including 22 that exercise real Firestore Security Rules against a live emulator (not mocks).
+UCL ONE is a unified campus information and services platform built for Universal College Lanka in response to the DevDash'26 problem statement: students have no single trusted channel for campus information, relying instead on WhatsApp groups, notice boards, and word of mouth. Rather than building 20+ disconnected mini-features, we built one reusable content engine covering 22 information categories, plus seven purpose-built action workflows for the things students actually need to *do* (book a room, report a lost item, register interest in an event, and so on), all gated by real server-side role-based access control (including per-department staff scopes for BR12), and an AI assistant grounded in the platform's own data. 29 of 33 business requirements are fully implemented and verified; two remain honestly documented as partial, and one (BR33, the AI assistant) is marked partial specifically because its live AI call has never executed in this environment — stated plainly rather than left ambiguous. 76+ automated tests pass across four suites, plus a committed, reproducible end-to-end suite, none of them mocking our own code — Firestore rules, Firebase Auth, and the browser flow are all exercised against real, running infrastructure.
+
+This report includes a self-critical section (§ 21) describing a forensic re-audit performed partway through the build, which found and fixed real gaps that an earlier draft of this same report had described more optimistically than the code actually supported — a booking-approval workflow with no conflict check, a public API that leaked draft content, targeting logic that sorted rather than filtered, and more. Those fixes, and the process that found them, are documented rather than smoothed over.
 
 ## 2. Problem Definition
 
@@ -15,14 +17,14 @@ UCL students currently discover campus information through fragmented, unofficia
 Three user roles were identified from the business requirements:
 
 - **Students** — the primary users. They need to *find* information relevant to them (BR1, BR2, BR10) and *act* on it (BR4, BR6, BR7, BR8, BR9, BR17, BR21) without needing to know who to ask.
-- **Staff** — publish and maintain official content (BR11), triage student-submitted requests (bookings, support requests, feedback, facility issues), and need this to be no harder than their current ad-hoc process, or they won't adopt it.
-- **Admin** — a superset of staff capability, additionally responsible for reference data (rooms) and account-level administration (BR12).
+- **Staff** — publish and maintain official content (BR11) and triage student-submitted requests (bookings, support requests, feedback, facility issues) *within their own department* (BR12: academic, society, or administrative), and need this to be no harder than their current ad-hoc process, or they won't adopt it.
+- **Admin** — a superset of staff capability across every department, additionally responsible for reference data (rooms) and account-level administration.
 
 A secondary, implicit user is the **future developer/administrator** maintaining the system after the hackathon (NFR5) — this shaped the decision to build one reusable content engine rather than 22 bespoke ones.
 
 ## 4. Business Requirements
 
-See [`/docs/requirements-traceability.md`](../docs/requirements-traceability.md) for the complete BR1–BR33 list mapped to implementation. Summary: BR1–BR23, BR25–BR26, BR28–BR33 are **COMPLETE** (29 requirements); BR24 and BR27 are **PARTIAL**.
+See [`/docs/requirements-traceability.md`](../docs/requirements-traceability.md) for the complete BR1–BR33 list mapped to implementation, re-audited against the running code after the forensic review in § 21. Summary: 29 requirements are **COMPLETE**; BR24 and BR27 are **PARTIAL** (unchanged, documented reasons); BR33 is **PARTIAL** specifically because its Gemini call has never executed in this environment, even though the surrounding architecture is complete and tested.
 
 ## 5. Requirement Prioritisation
 
@@ -69,7 +71,7 @@ No custom Node/Express backend exists. Authorization for transactional data live
 
 See `frontend/src/types/models.ts` for full TypeScript definitions. Core entities:
 
-- `UserProfile` (uid, role, faculty, programme, yearGroup) — role is one of STUDENT/STAFF/ADMIN, immutable by the owning user after creation.
+- `UserProfile` (uid, role, faculty, programme, yearGroup, staffDepartment) — role is one of STUDENT/STAFF/ADMIN, immutable by the owning user after creation. `staffDepartment` (ACADEMIC/SOCIETY/ADMINISTRATIVE/FINANCE/null) is consumed by both `firestore.rules` (`isAdminOrDepartment`) and `lib/permissions.ts` to gate which collections a STAFF account can act on — it existed as a field before it had any real consumer, which a forensic audit correctly flagged as dead data; it is now wired up (§ 21).
 - `ContentItem` (Strapi) — title, description, `category` (22-value enum), `audience` (EVERYONE/FACULTY/PROGRAMME/YEAR_GROUP) + matching targeting fields, optional event fields (date/time/location/contact), `isEmergency` flag, status.
 - `Room`, `RoomBooking` (date, start/end time, status PENDING/APPROVED/REJECTED/CANCELLED, requester, decider).
 - `EventInterest`, `SocietyInterest` — join records between a student and a content item.
@@ -83,19 +85,22 @@ Authentication is Firebase Authentication (email/password). Authorization is **n
 
 - Public self-signup can only ever create a STUDENT account. STAFF/ADMIN accounts are seeded out-of-band. This was a deliberate change from an earlier design (a client-side "staff signup code") once we recognised the repository would be public — any embedded code would be visible to anyone reading the source, making it worthless as a safeguard.
 - A student cannot self-promote their role via a client update — enforced by comparing `request.resource.data.role == resource.data.role` in the rule, not just omitting a "change role" button from the UI.
-- 22 automated tests (`src/test/firestore.rules.test.ts`) run these rules against the real Firestore emulator and are part of the CI-able test suite (`npm run test:rules`).
+- BR12 department differentiation: a STAFF account's `staffDepartment` gates `roomBookings` approval (ADMINISTRATIVE), `academicSupportRequests` (ACADEMIC), `feedback` (ADMINISTRATIVE), `facilityIssues` (ADMINISTRATIVE), and `societyInterests` read access (SOCIETY) — enforced by `isAdminOrDepartment(dept)` in `firestore.rules`, with a matching `hasPermission(role, department, permission)` in the frontend that controls which Staff Console tabs render. FINANCE has no Firestore-backed action; financial content is managed via Strapi's own admin auth instead (documented, not silently omitted).
+- 44+ automated tests (`src/test/firestore.rules.test.ts`, `src/test/booking-conflict.integration.test.ts`) run these rules against the real Firestore emulator and are part of the CI-able test suite (`npm run test:rules`), including department-boundary rejection tests (a staff member outside the right department is denied, not just hidden from the UI).
 
 ## 10. Core Workflows
 
-**Classroom booking (BR8)**: student picks a date/time range → client checks every room's existing PENDING/APPROVED bookings for that date and computes overlap (`timeRangesOverlap`) → available rooms are offered → on request, the check is repeated immediately before writing (shrinking, not eliminating, the race window — see Limitations) → booking is created as PENDING → staff approve/reject in the Staff Console → student sees the status update live via a Firestore `onSnapshot` listener.
+**Classroom booking (BR8)**: student picks a date/time range → client checks every room's existing PENDING/APPROVED bookings for that date and computes overlap (`timeRangesOverlap`) → available rooms are offered → on request, the check is repeated immediately before writing (shrinking, not eliminating, the request-time race window) → booking is created as PENDING → staff approve/reject in the Staff Console → student sees the status update live via a Firestore `onSnapshot` listener. **Approval itself is also conflict-checked**: `decideBooking` runs inside a Firestore transaction that re-reads the target booking and every other APPROVED booking for the same room/date at commit time, rejecting the approval if any overlap exists. This was added after a forensic audit found the original implementation had *zero* conflict awareness at approval — two overlapping PENDING requests could both be approved with no warning anywhere in the UI (§ 21).
 
-**Event interest (BR4)**: the Firestore document id is deterministic (`{eventId}_{uid}`), so registering interest twice is idempotent by construction rather than needing a duplicate-check query.
+**Event interest (BR4)**: the Firestore document id is deterministic (`{eventId}_{uid}`), so registering interest twice is idempotent by construction rather than needing a duplicate-check query. **Society sign-up (BR6)** now uses the same pattern (`{societyId}_{uid}`) — it originally used an auto-generated id, relying on client-held state alone for duplicate prevention, which a forensic audit flagged as structurally weaker than BR4 (§ 21).
 
-**Targeted announcements (BR2)**: `lib/targeting.ts` scores every content item for the signed-in student (emergency > relevant-targeted > general) and sorts the dashboard accordingly; this was verified both by unit test and by browser screenshot.
+**Targeted announcements (BR2)**: `lib/targeting.ts` now *filters* (`filterVisibleToStudent`) content targeted at a different faculty/programme/year out of every personalised dashboard section, then sorts what remains (emergency > targeted-and-relevant > general). The filtering step was added after a forensic audit found the original implementation only sorted — content targeted at another faculty was still shown to every student, just lower in the list, contradicting BR2's "distinct from general information" (§ 21).
 
 ## 11. AI Assistant Design
 
-See `README.md` § AI Architecture for the full data flow. Design principles: (1) never let the assistant say something not grounded in the platform's own content — the prompt sent to Gemini includes *only* the retrieved content, with an explicit instruction to say so if the content doesn't answer the question; (2) never let an AI outage silently degrade to a worse-but-unlabelled experience — the fallback path is functionally the same retrieval, just without the generative step, and is explicitly labelled "(search fallback)" in the UI; (3) ground the retrieval itself well enough that the fallback is useful on its own, not just a placeholder — this required a category-aware keyword scorer (see § 21 Limitations Discovered During Testing) after an early test showed "Are there any events this week?" surfacing a cafeteria menu ahead of actual events.
+See `README.md` § AI Architecture for the full data flow. Design principles: (1) never let the assistant say something not grounded in the platform's own content — Gemini's `systemInstruction` includes *only* the retrieved content plus an explicit instruction to say so if it doesn't answer the question, kept structurally separate from the raw student question (sent as the sole `user` turn) to reduce the risk of the question itself injecting new instructions; (2) never let an AI outage silently degrade to a worse-but-unlabelled experience — the fallback path is functionally the same retrieval, just without the generative step, and is explicitly labelled "(search fallback)" in the UI; (3) ground the retrieval itself well enough that the fallback is useful on its own, not just a placeholder.
+
+**Honest status**: `VITE_GEMINI_API_KEY` has been empty throughout this project's history, in the original build, the forensic audit, and this fix pass. The Gemini code path has never executed. This is BR33's core mechanism and the highest-weighted single business requirement, so it is stated here without qualification: **GEMINI NOT EXECUTED — FALLBACK VERIFIED.** What is verified is the retrieval and fallback quality, which the forensic audit tested hard: an early test showed "Are there any events this week?" surfacing a cafeteria menu ahead of actual events (naive substring matching - "week" inside "weekly"), and separately "Can I book a sports facility?" surfaced an unrelated textbook listing ("book" inside "textbook"). Both are fixed with whole-word matching and covered by regression tests, and both are documented here rather than only in a commit message, because they're exactly the kind of thing that would otherwise quietly resurface.
 
 ## 12. UI/UX Design Decisions
 
@@ -113,14 +118,16 @@ See `README.md` § AI Architecture for the full data flow. Design principles: (1
 
 ## 14. Security
 
-- Firestore Security Rules are the actual authorization boundary (see § 9), verified by 22 automated tests against a live emulator.
-- No secrets are hard-coded. `.env` files are git-ignored; `.env.example` documents every variable.
-- **Known trade-off**: `VITE_GEMINI_API_KEY`, if configured, is used in a direct client-side fetch to the Gemini API, so it is visible in the browser. A production deployment should proxy this through a server-side function (Firebase Cloud Function) so the key never reaches the client — not built here due to time, and noted in Future Improvements.
-- **Known trade-off**: `roomBookings` documents are readable by any signed-in user rather than owner-restricted, because Firestore rejects a `list` query whose security rule depends on a field the query doesn't filter by (discovered via the browser smoke test in § 20; see the comment in `firebase/firestore.rules`).
+- Firestore Security Rules are the actual authorization boundary (see § 9), verified by 44+ automated tests against a live emulator, including department-boundary enforcement.
+- The public Strapi content API is forced to `status=published` server-side, regardless of what a caller requests. This was **not** originally true: a forensic audit found that an anonymous request to `GET /api/content-items?status=draft` returned real, unpublished draft content (verified live with `curl`). Fixed by overriding the controller's `find`/`findOne` to always force `status=published`, and covered by a reproducible regression script (`cms/scripts/verify-public-api-security.mjs`, 5/5 checks: anonymous published read succeeds, anonymous draft read never returns an unpublished row, anonymous write stays rejected, admin API still requires auth). See § 21.
+- No secrets are hard-coded. `.env` files are git-ignored; `.env.example` documents every variable. Verified via `git grep` for API-key-shaped strings across tracked files.
+- The Gemini prompt no longer concatenates the persona/rules and the raw user question into one string — they're split across `systemInstruction` and the `user` turn respectively, reducing (not eliminating) the simplest class of prompt injection.
+- **Known trade-off**: `VITE_GEMINI_API_KEY`, if configured, is used in a direct client-side fetch to the Gemini API, so it is visible in the browser. A production deployment should proxy this through a server-side function (Firebase Cloud Function) so the key never reaches the client — not built here due to time, and noted in Future Improvements. Moot in this environment: the key has never been configured at all.
+- **Known trade-off**: `roomBookings` documents are readable by any signed-in user rather than owner-restricted, because Firestore rejects a `list` query whose security rule depends on a field the query doesn't filter by (see the comment in `firebase/firestore.rules`).
 
 ## 15. Performance
 
-Firestore queries filter server-side on the fields actually used (`where('requestedBy', ...)`, `where('roomId', ...)`, etc.) rather than fetching everything and filtering client-side. The Strapi API call caps `pageSize` at 100. No client-side cache (e.g. React Query) or route-based code-splitting was added; the production bundle is one ~875 KB JS file. This is flagged as NFR2 = PARTIAL rather than silently accepted.
+Firestore queries filter server-side on the fields actually used (`where('requestedBy', ...)`, `where('roomId', ...)`, etc.) rather than fetching everything and filtering client-side. The Strapi API call caps `pageSize` at 100. Route-level code splitting (`React.lazy` per page in `App.tsx`) was added and measured in a fresh build: roughly 20 page-specific chunks of 0.2–10 kB each, downloaded only when a route is visited, instead of shipping all of them upfront. The remaining vendor chunk is still ~823 kB gzipped ~249 kB — mostly the Firebase SDK, used by nearly every route, so further reduction there would mean removing functionality rather than just splitting it. No client-side cache (e.g. React Query) was added. This is flagged as NFR2 = PARTIAL — genuinely improved, not fully solved.
 
 ## 16. Reliability
 
@@ -130,63 +137,96 @@ Firebase (Auth + Firestore) and Strapi are each independently available; there i
 
 Every create form (booking, lost & found, support request, feedback, facility issue) validates required fields client-side before submission and is independently rejected by Firestore rules if a client somehow bypassed that (e.g. `status` on booking creation must be `'PENDING'`). Every data-fetching view has three states beyond its happy path: loading (`Spinner`), empty (`EmptyState`), and error (`ErrorState`/`ServiceUnavailable`) — verified concretely by disconnecting Strapi during development and confirming the dashboard shows "Campus content is unavailable right now" instead of crashing.
 
+A forensic audit, while diagnosing an unrelated environment issue (a mismatched Firebase project id between the app and the seed script — see § 21), found a real, separate robustness gap this uncovered: seven pages (`LostFoundPage`, `AcademicSupportPage`, `FeedbackPage`, `FacilityIssuesPage`, `RoomsPage`, `EventsPage`, `SocietiesPage`) had a silent `if (!profile) return` guard in their action handlers. If a user's profile hadn't finished loading for any reason, clicking submit did nothing — no error, no feedback, indistinguishable from a broken button. Every one now either shows an explicit message ("Your session hasn't finished loading yet...") or disables the action outright. `AuthContext`'s profile-fetch failure path also now logs the actual error to the console instead of swallowing it, which is what made this bug slow enough to diagnose that it was worth fixing for the next person who hits it.
+
 ## 18. Testing Strategy
 
 Four layers, chosen so that "the tests pass" means something real rather than testing mocks of our own code:
 
-1. **Pure-logic unit tests** (Vitest) for anything with no external dependency: RBAC permission map, targeting/relevance sort, room-booking time-overlap conflict detection, AI fallback behaviour.
-2. **Firestore Security Rules tests** (`@firebase/rules-unit-testing`) run against the actual Firestore emulator — these are not mocks; a rule with a typo would genuinely fail these tests.
+1. **Pure-logic unit tests** (Vitest) for anything with no external dependency: RBAC/department permission map, targeting filter, room-booking time-overlap conflict detection, AI fallback behaviour.
+2. **Firestore Security Rules + integration tests** (`@firebase/rules-unit-testing`) run against the actual Firestore emulator — these are not mocks; a rule with a typo would genuinely fail these tests. Includes the booking-approval transaction test, which calls the *actual* `decideBooking` function (not a reimplementation) with its Firestore instance swapped for an isolated emulator project.
 3. **Firebase Authentication tests** run against the actual Auth emulator — valid login, wrong password, unregistered email.
-4. **Manual/scripted end-to-end smoke test** (Playwright, headless Chromium) driving the real running app through the full demo golden path.
+4. **Committed, reproducible end-to-end suite** (`frontend/e2e/smoke.spec.ts`, Playwright, `npm run test:e2e`). Earlier in this project, E2E verification was done via ad-hoc scripts that were never added to the repository — real results, but not independently reproducible by anyone who clones it. This is fixed: the suite is a normal project dependency with a normal npm script.
 
 ## 19. Test Results
 
 All results below are from an actual run performed during this build, not projected or invented:
 
 ```
-Unit tests (frontend/):        19 passed, 0 failed   — npm test
-Firestore rules tests:         22 passed, 0 failed   — npm run test:rules
-Auth emulator tests:            3 passed, 0 failed   — npm run test:auth
-                                ─────────────────────
-Total automated:               44 passed, 0 failed
+Unit tests (frontend/):           29 passed, 0 failed   — npm test
+Firestore rules + integration:    44 passed, 0 failed   — npm run test:rules
+Auth emulator tests:               3 passed, 0 failed   — npm run test:auth
+                                   ─────────────────────
+Total automated:                  76 passed, 0 failed
 
-Browser E2E smoke test (Playwright, headless Chromium):
-  1. Unauthenticated → redirected to /login                         PASS
-  2. Student login → dashboard renders targeted content + emergencies PASS
-  3. AI Assistant answers "Are there any events this week?"          PASS (after fix, see §21)
-  4. Event interest toggle + live count update                       PASS
-  5. Room availability check + booking request submission            PASS (after fix, see §21)
-  6. Staff Console: approve pending booking                          PASS
-  7. Student sees booking status change to APPROVED                  PASS
-  Console errors during full run:                                    0
+E2E smoke suite (Playwright, npm run test:e2e — committed, reproducible):
+  1. Unauthenticated → redirected to /login                          PASS
+  2. Student login → dashboard                                       PASS
+  3. Search & Discover                                                PASS
+  4. Targeted content visible on dashboard                            PASS
+  5. Event visibility + interest                                     PASS
+  6. Society sign-up                                                 PASS
+  7. Classroom booking request                                       PASS
+  8. Lost & found report                                             PASS (after fix, see §21)
+  9. AI assistant answers a question                                 PASS
+  10. Logout                                                          PASS
+  11. Staff approves the booking from step 7                          PASS
+  Console errors during full run:                                     0
+  Result: 1 passed (6.5s)
+
+Strapi public API security regression (cms/scripts/verify-public-api-security.mjs):
+  anonymous published read succeeds (200)                             PASS
+  anonymous published read returns only published entries             PASS
+  anonymous ?status=draft never returns an unpublished row             PASS (after fix, see §21)
+  anonymous write is rejected (403)                                   PASS
+  admin API requires authentication (401)                             PASS
 ```
 
 ## 20. Requirement Traceability
 
 See [`/docs/requirements-traceability.md`](../docs/requirements-traceability.md) — kept as a separate document since it is referenced independently during code review.
 
-## 21. Innovation
+## 21. Forensic Audit and Fixes
 
-The innovation in UCL ONE is architectural, not decorative: (1) a single reusable content engine that makes 20 of the 33 business requirements nearly free to add once the pattern exists, rather than 20 separate features; (2) targeting-aware content (BR2) that generalises across every category, not just announcements — the same `audience`/`faculty`/`programme`/`yearGroup` fields work for onboarding content, calendar entries, or job postings equally; (3) an AI assistant that is provably grounded in the platform's own data rather than a generic chatbot bolted on — verified by the fact that its fallback mode (no external AI call at all) is still useful, because the retrieval quality is the actual product, not the generative wrapper around it.
+Partway through the build, we conducted a deliberately adversarial, evidence-based re-audit of our own repository — treating our own earlier documentation as a claim to verify, not a fact, and re-checking every "COMPLETE" business requirement against the actual running code and test suite rather than against what an earlier version of this report said. This surfaced real gaps, all of which are now fixed, tested, and documented rather than quietly corrected:
 
-**A concrete example of this being taken seriously rather than claimed**: during manual browser testing, we found the AI assistant's keyword fallback ranked a cafeteria menu above actual events for the question "Are there any events this week?" because "week" is a substring of "weekly." We fixed this with category-aware scoring and date tie-breaking, then re-ran the browser test to confirm the fix — this fix (and the test that caught it) is documented here rather than glossed over, per the hackathon's honesty requirement.
+| Finding | Severity | Fix | Verification |
+|---|---|---|---|
+| Public Strapi API returned unpublished draft content to anonymous requests via `?status=draft` | High | Controller override forces `status=published` server-side, unconditionally | `cms/scripts/verify-public-api-security.mjs`, 5/5 checks, run against the live instance |
+| BR2 targeting only sorted irrelevant content lower, never excluded it | Medium | `filterVisibleToStudent` added, applied to every personalised dashboard section | 9 new unit tests |
+| BR8 room booking approval had zero conflict awareness — two overlapping PENDING requests could both be approved | Medium | `decideBooking` now runs inside a Firestore transaction re-validating against every other APPROVED booking | 6 integration tests (no conflict / exact / partial overlap / adjacent / different room / wrong department) |
+| BR12's `staffDepartment` field existed but was never read anywhere — every STAFF account had identical permissions | Medium | `isAdminOrDepartment(dept)` gates 5 collections server-side; Staff Console only shows matching tabs | New rules tests + 3 differentiated demo staff accounts |
+| BR6 society sign-up used an auto-generated document id, unlike BR4's deterministic one, so duplicate prevention relied on client state alone | Low–Medium | Switched to the same `{id}_{uid}` deterministic pattern | 1 new rules test |
+| `academicSupportRequests`, `feedback`, `facilityIssues` had defined rules but zero automated test coverage | Medium (evidence gap) | 13 new rules tests covering owner/cross-student/department boundaries | — |
+| AI retrieval used substring matching, causing false positives ("book" in "textbook", "week" in "weekly") | Low (quality) | Whole-word matching | 2 regression tests |
+| AI prompt concatenated instructions and raw user input into one string | Low (defense-in-depth) | Split across Gemini's `systemInstruction` and the `user` turn | Structural change, not independently testable without a live key |
+| Prior E2E verification was real but done via uncommitted, ad-hoc scripts — not reproducible from the repository | Medium (report-quality) | Committed `frontend/e2e/smoke.spec.ts` + `npm run test:e2e` | Runs clean, 0 console errors |
+| `date-fns`, `@testing-library/react`, `@testing-library/user-event` were installed but never imported anywhere | Low (hygiene) | Removed | `npm ls` / build unaffected |
+| Seed script hardcoded a project id, so a real Firebase project configured with a different id caused the app to silently see `profile: null` (a missing document isn't a permissions error) | Medium (discovered while building the E2E suite) | Script now reads `VITE_FIREBASE_PROJECT_ID` from `frontend/.env`; `singleProjectMode` removed from `firebase.json` (it was causing the same email to resolve to different Auth uids depending on which SDK made the request) | E2E suite passes end-to-end after the fix |
+| 7 pages silently no-op'd their submit handler if `profile` was momentarily null, with zero user feedback | Low–Medium (found while diagnosing the item above) | Explicit message or disabled state instead | Manual verification, screenshot evidence |
 
-## 22. Limitations
+We consider this section as important as any feature described elsewhere in this report. A hackathon report that only lists what works is not more credible for omitting what didn't — it's less credible, because judges checking claims against code (as we did to ourselves) will find the gaps either way. Documenting the finding-and-fixing process is the more defensible position, and matches DevDash'26's explicit requirement to document "testing outcomes" honestly.
 
-See `README.md` § Known Limitations for the full list: BR24/BR27 partial coverage, non-atomic booking conflict detection, broadened `roomBookings` read access (a Firestore constraint, not an oversight), no code-splitting, and the Gemini API key being used client-side rather than proxied.
+## 22. Innovation
 
-## 23. Future Improvements
+The innovation in UCL ONE is architectural, not decorative: (1) a single reusable content engine that makes 20 of the 33 business requirements nearly free to add once the pattern exists, rather than 20 separate features; (2) targeting-aware content (BR2) that generalises across every category, not just announcements — the same `audience`/`faculty`/`programme`/`yearGroup` fields work for onboarding content, calendar entries, or job postings equally, and now genuinely filters rather than just reorders; (3) department-aware staff permissions (BR12) that reuse one small `isAdminOrDepartment` primitive across five collections instead of five bespoke role checks; (4) an AI assistant that is provably grounded in the platform's own data rather than a generic chatbot bolted on — its fallback mode (no external AI call at all) is still useful, because the retrieval quality is the actual product, not the generative wrapper around it; (5) a self-imposed forensic audit process (§ 21) that we treat as part of the engineering deliverable, not an afterthought.
 
-Cloud Function-proxied AI calls and atomic booking transactions; a student-authored textbook marketplace and sports-facility booking (both would reuse the existing room-booking UX pattern); push notifications (the `notifications` collection already exists in the data model, unused by any UI yet); code-splitting and a client cache for NFR2; retry/offline handling for NFR3.
+## 23. Limitations
 
-## 24. Libraries / APIs Used
+See `README.md` § Known Limitations for the full, current list: BR24/BR27 partial coverage, BR12's FINANCE department having no dedicated Firestore action, room booking approval being optimistic-concurrency-checked rather than fully pessimistically locked, broadened `roomBookings` read access (a Firestore constraint, not an oversight), the AI assistant never having executed a real Gemini call in this environment, and the Gemini API key being client-side rather than proxied if it were ever configured.
 
-React, TypeScript, Vite, Tailwind CSS v4, `react-router-dom`, `lucide-react`, `date-fns`, Firebase JS SDK, Firebase Admin SDK (seed script only), Strapi 5, Vitest, `@testing-library/react`, `@firebase/rules-unit-testing`, Google Gemini API (`gemini-2.0-flash`), Playwright (used only for the manual smoke-test evidence in this report, not shipped with the app). All open-source or documented public APIs, as disclosed in `README.md` § 18.
+## 24. Future Improvements
 
-## 25. Team Contribution
+Cloud Function-proxied AI calls and fully atomic booking transactions (closing the narrow remaining approval race window); a student-authored textbook marketplace and sports-facility booking (both would reuse the existing room-booking UX pattern); a FINANCE-department Firestore action if a real one emerges; push notifications (the `notifications` collection already exists in the data model, unused by any UI yet); a client cache for NFR2 on top of the code-splitting already done; retry/offline handling for NFR3.
 
-Built by Team Dewshan's Kids for DevDash'26, using Claude (Anthropic) as a directed AI pair-programming aid within the hackathon's AI-as-aid rule. Every architectural and product decision recorded in this report — the content-engine/action-workflow split, the RBAC model, the AI grounding strategy, the decision to restrict self-signup to STUDENT — was a human decision made in response to the constraints found in the repository and the judging criteria, not an unreviewed AI suggestion.
+## 25. Libraries / APIs Used
 
-## 26. Conclusion
+React, TypeScript, Vite, Tailwind CSS v4, `react-router-dom`, `lucide-react`, Firebase JS SDK, Firebase Admin SDK (seed script only), Strapi 5, Vitest, `@testing-library/jest-dom`, `@firebase/rules-unit-testing`, `@playwright/test` (committed E2E suite, not just ad-hoc verification), Google Gemini API (`gemini-2.0-flash`). All open-source or documented public APIs, as disclosed in `README.md` § 18.
 
-UCL ONE demonstrates that "one trusted channel" doesn't have to mean "one giant application with 33 hand-built features." By separating campus information (which is read-heavy, staff-authored, and highly reusable across categories) from campus actions (which are write-heavy, per-user, and need real authorization), we covered 31 of 33 business requirements and all six non-functional requirements within the hackathon window, backed by 44 passing automated tests and a verified end-to-end demo path — while being explicit, here and in the traceability document, about exactly what was not finished and why.
+## 26. Team Contribution
+
+Built by Team Dewshan's Kids for DevDash'26, using Claude (Anthropic) as a directed AI pair-programming aid within the hackathon's AI-as-aid rule. Every architectural and product decision recorded in this report — the content-engine/action-workflow split, the RBAC and department model, the AI grounding strategy, the decision to restrict self-signup to STUDENT, and the decision to run a self-critical forensic audit rather than declare completion — was a human decision made in response to the constraints found in the repository and the judging criteria, not an unreviewed AI suggestion.
+
+## 27. Conclusion
+
+UCL ONE demonstrates that "one trusted channel" doesn't have to mean "one giant application with 33 hand-built features." By separating campus information (which is read-heavy, staff-authored, and highly reusable across categories) from campus actions (which are write-heavy, per-user, and need real authorization, including per-department staff scopes), we covered 29 of 33 business requirements within the hackathon window, backed by 76+ passing automated tests and a verified, committed end-to-end demo path. Just as importantly, we found and fixed real gaps between an earlier draft of our own claims and what the code actually did — and we're reporting that process, not just its outcome, because that is what "evidence of how the solution was developed and validated" should mean.

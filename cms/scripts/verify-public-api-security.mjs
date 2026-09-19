@@ -52,10 +52,17 @@ async function main() {
   check('admin API requires authentication (401)', adminRes.status === 401);
 
   console.log(failures === 0 ? '\nAll public-API security checks passed.' : `\n${failures} check(s) FAILED.`);
-  process.exit(failures === 0 ? 0 : 1);
+  // Setting exitCode and letting the event loop drain naturally (rather than
+  // calling process.exit() directly) avoids a Node/undici crash on Windows
+  // where fetch's keep-alive sockets aren't closed before a forced exit
+  // ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)") - which
+  // otherwise makes this script report a non-zero exit code even when every
+  // check passed, exactly the kind of false failure a CI script must not
+  // produce.
+  process.exitCode = failures === 0 ? 0 : 1;
 }
 
 main().catch((err) => {
   console.error('verify-public-api-security failed to run:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });
