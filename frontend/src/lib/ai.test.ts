@@ -55,4 +55,27 @@ describe('askAssistant fallback (no Gemini API key configured)', () => {
     const result = await askAssistant('Can I book a classroom tomorrow?', [], null)
     expect(result.routes.some((r) => r.path === '/rooms')).toBe(true)
   })
+
+  it('does not match "book" inside unrelated words like "textbook" (regression: word-boundary matching)', async () => {
+    const corpus = [
+      makeItem({ id: 1, category: 'EVENT', title: 'Inter-Faculty Football Tournament', description: 'Cheer on your faculty team.' }),
+      makeItem({
+        id: 2,
+        category: 'TEXTBOOK',
+        title: 'Second-Hand Textbooks — Data Structures',
+        description: 'Selling a lightly used copy of the textbook.',
+      }),
+    ]
+    const result = await askAssistant('Can I book a sports facility?', corpus, null)
+    expect(result.sources.map((s) => s.id)).not.toContain(2)
+  })
+
+  it('ranks actual events above unrelated content that merely shares a word (regression: "week" vs "weekly")', async () => {
+    const corpus = [
+      makeItem({ id: 1, category: 'EVENT', title: 'AI Hackathon Showcase', description: 'Live demos this week.', eventDate: '2026-10-01' }),
+      makeItem({ id: 2, category: 'DINING', title: 'Cafeteria Weekly Menu', description: 'This week\'s menu includes rice & curry.' }),
+    ]
+    const result = await askAssistant('Are there any events this week?', corpus, null)
+    expect(result.sources[0]?.id).toBe(1)
+  })
 })
