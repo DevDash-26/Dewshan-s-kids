@@ -1,9 +1,12 @@
 // Seeds demo accounts and reference data into the Firebase Local Emulator
 // Suite (Auth + Firestore) so the prototype is demoable immediately.
 //
-// This script ONLY ever targets the emulator (it hard-fails if the emulator
-// env vars aren't set) — it must never be pointed at a live Firebase
-// project, since it creates well-known demo passwords.
+// This script ONLY ever targets a local emulator - it must never be pointed
+// at a live Firebase project, since it creates well-known demo passwords.
+// That is actually enforced below (not just asserted in this comment): both
+// emulator host env vars, whether left at their localhost defaults or set
+// explicitly, are required to resolve to a loopback address, or the script
+// refuses to run.
 //
 // Usage: firebase emulators:exec --project ucl-one-demo "node scripts/seed-emulator.mjs"
 // or, with emulators already running: node scripts/seed-emulator.mjs
@@ -14,6 +17,18 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 const AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? '127.0.0.1:9099';
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
+
+const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])[:/]/;
+for (const [name, value] of [
+  ['FIREBASE_AUTH_EMULATOR_HOST', AUTH_EMULATOR_HOST],
+  ['FIRESTORE_EMULATOR_HOST', FIRESTORE_EMULATOR_HOST],
+]) {
+  if (!LOOPBACK_HOST.test(`${value}:`)) {
+    console.error(`[seed] refusing to run: ${name}="${value}" is not a loopback address. This script must only target a local emulator.`);
+    process.exit(1);
+  }
+}
+
 process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_EMULATOR_HOST;
 process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE_EMULATOR_HOST;
 
@@ -27,15 +42,41 @@ const DEMO_USERS = [
     password: 'Demo123!',
     displayName: 'Sanuli Fernando',
     role: 'STUDENT',
+    staffDepartment: null,
     faculty: 'Faculty of Computing',
     programme: 'BSc Software Engineering',
     yearGroup: 2,
   },
   {
-    email: 'staff.demo@uclone.lk',
+    // BR12: staff accounts are differentiated by department, each with its
+    // own set of manageable request types (see firebase/firestore.rules and
+    // frontend/src/lib/permissions.ts). Three departments are seeded so the
+    // differentiation is actually demonstrable, not just modelled.
+    email: 'staff.admin@uclone.lk',
     password: 'Demo123!',
     displayName: 'Mr. Nuwan Silva',
     role: 'STAFF',
+    staffDepartment: 'ADMINISTRATIVE',
+    faculty: null,
+    programme: null,
+    yearGroup: null,
+  },
+  {
+    email: 'staff.academic@uclone.lk',
+    password: 'Demo123!',
+    displayName: 'Dr. Priyantha Weerasinghe',
+    role: 'STAFF',
+    staffDepartment: 'ACADEMIC',
+    faculty: null,
+    programme: null,
+    yearGroup: null,
+  },
+  {
+    email: 'staff.society@uclone.lk',
+    password: 'Demo123!',
+    displayName: 'Ms. Ishara Gunawardena',
+    role: 'STAFF',
+    staffDepartment: 'SOCIETY',
     faculty: null,
     programme: null,
     yearGroup: null,
@@ -45,6 +86,7 @@ const DEMO_USERS = [
     password: 'Demo123!',
     displayName: 'Ms. Kavindi Jayasuriya',
     role: 'ADMIN',
+    staffDepartment: null,
     faculty: null,
     programme: null,
     yearGroup: null,
@@ -78,7 +120,7 @@ async function seedUsers() {
       email: user.email,
       displayName: user.displayName,
       role: user.role,
-      staffDepartment: null,
+      staffDepartment: user.staffDepartment ?? null,
       faculty: user.faculty,
       programme: user.programme,
       yearGroup: user.yearGroup,

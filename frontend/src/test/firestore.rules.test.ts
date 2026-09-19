@@ -39,10 +39,17 @@ beforeEach(async () => {
   // Seed profiles directly, bypassing rules, so tests exercise one rule at a time.
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore()
-    await setDoc(doc(db, 'users', 'student-1'), { uid: 'student-1', role: 'STUDENT' })
-    await setDoc(doc(db, 'users', 'student-2'), { uid: 'student-2', role: 'STUDENT' })
-    await setDoc(doc(db, 'users', 'staff-1'), { uid: 'staff-1', role: 'STAFF' })
-    await setDoc(doc(db, 'users', 'admin-1'), { uid: 'admin-1', role: 'ADMIN' })
+    await setDoc(doc(db, 'users', 'student-1'), { uid: 'student-1', role: 'STUDENT', staffDepartment: null })
+    await setDoc(doc(db, 'users', 'student-2'), { uid: 'student-2', role: 'STUDENT', staffDepartment: null })
+    // staff-1 has no department assigned (mirrors a real newly-seeded staff
+    // account before an admin assigns one) - used for role-level checks that
+    // don't depend on department.
+    await setDoc(doc(db, 'users', 'staff-1'), { uid: 'staff-1', role: 'STAFF', staffDepartment: null })
+    // BR12: department-specific staff used by the tests below that verify
+    // department-gated collections (roomBookings approval, societyInterests).
+    await setDoc(doc(db, 'users', 'staff-administrative'), { uid: 'staff-administrative', role: 'STAFF', staffDepartment: 'ADMINISTRATIVE' })
+    await setDoc(doc(db, 'users', 'staff-society'), { uid: 'staff-society', role: 'STAFF', staffDepartment: 'SOCIETY' })
+    await setDoc(doc(db, 'users', 'admin-1'), { uid: 'admin-1', role: 'ADMIN', staffDepartment: null })
   })
 })
 
@@ -134,7 +141,7 @@ describe('roomBookings collection (BR8)', () => {
     await assertFails(updateDoc(doc(authed, 'roomBookings', 'b3'), { status: 'APPROVED' }))
   })
 
-  it('allows staff to approve a pending booking', async () => {
+  it('allows ADMINISTRATIVE-department staff to approve a pending booking (BR12)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) =>
       setDoc(doc(ctx.firestore(), 'roomBookings', 'b4'), {
         roomId: 'r1',
@@ -142,8 +149,20 @@ describe('roomBookings collection (BR8)', () => {
         status: 'PENDING',
       }),
     )
-    const staffDb = testEnv.authenticatedContext('staff-1').firestore()
-    await assertSucceeds(updateDoc(doc(staffDb, 'roomBookings', 'b4'), { status: 'APPROVED', decidedBy: 'staff-1' }))
+    const staffDb = testEnv.authenticatedContext('staff-administrative').firestore()
+    await assertSucceeds(updateDoc(doc(staffDb, 'roomBookings', 'b4'), { status: 'APPROVED', decidedBy: 'staff-administrative' }))
+  })
+
+  it('rejects a staff member outside the ADMINISTRATIVE department approving a booking (BR12)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) =>
+      setDoc(doc(ctx.firestore(), 'roomBookings', 'b4b'), {
+        roomId: 'r1',
+        requestedBy: 'student-1',
+        status: 'PENDING',
+      }),
+    )
+    const staffDb = testEnv.authenticatedContext('staff-society').firestore()
+    await assertFails(updateDoc(doc(staffDb, 'roomBookings', 'b4b'), { status: 'APPROVED', decidedBy: 'staff-society' }))
   })
 
   it('allows any signed-in student to read booking records (needed to check room availability, BR8)', async () => {
@@ -183,12 +202,29 @@ describe('societyInterests collection (BR6)', () => {
     await assertFails(getDoc(doc(authed, 'societyInterests', 'si2')))
   })
 
-  it('allows staff to read any society sign-up', async () => {
+  it('allows SOCIETY-department staff to read any society sign-up (BR12)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) =>
       setDoc(doc(ctx.firestore(), 'societyInterests', 'si3'), { contentItemId: 9, studentId: 'student-2' }),
     )
-    const staffDb = testEnv.authenticatedContext('staff-1').firestore()
+    const staffDb = testEnv.authenticatedContext('staff-society').firestore()
     await assertSucceeds(getDoc(doc(staffDb, 'societyInterests', 'si3')))
+  })
+
+  it('rejects a staff member outside the SOCIETY department reading a sign-up (BR12)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) =>
+      setDoc(doc(ctx.firestore(), 'societyInterests', 'si4'), { contentItemId: 9, studentId: 'student-2' }),
+    )
+    const staffDb = testEnv.authenticatedContext('staff-administrative').firestore()
+    await assertFails(getDoc(doc(staffDb, 'societyInterests', 'si4')))
+  })
+
+  it('allows a student to re-join a society idempotently via the deterministic id (BR6 duplicate prevention)', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    const ref = doc(authed, 'societyInterests', '9_student-1')
+    await assertSucceeds(setDoc(ref, { contentItemId: 9, studentId: 'student-1', studentName: 'Student One', message: null }))
+    // Re-joining overwrites the same document (an update, not a duplicate) -
+    // still succeeds, and no second document is created.
+    await assertSucceeds(setDoc(ref, { contentItemId: 9, studentId: 'student-1', studentName: 'Student One', message: null }))
   })
 })
 
@@ -212,6 +248,99 @@ describe('lostFoundItems collection (BR7)', () => {
     )
     const authed = testEnv.authenticatedContext('student-1').firestore()
     await assertFails(updateDoc(doc(authed, 'lostFoundItems', 'lf3'), { status: 'RESOLVED' }))
+  })
+})
+
+describe('academicSupportRequests collection (BR9, BR12: academic staff)', () => {
+  it('allows a student to create their own request', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertSucceeds(setDoc(doc(authed, 'academicSupportRequests', 'req1'), { requestedBy: 'student-1', kind: 'STUDY_GROUP', status: 'OPEN' }))
+  })
+
+  it('rejects creating a request on someone else\'s behalf', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(setDoc(doc(authed, 'academicSupportRequests', 'req2'), { requestedBy: 'student-2', kind: 'STUDY_GROUP', status: 'OPEN' }))
+  })
+
+  it('allows the owner to read their own request but not another student\'s', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) =>
+      setDoc(doc(ctx.firestore(), 'academicSupportRequests', 'req3'), { requestedBy: 'student-2', status: 'OPEN' }),
+    )
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(getDoc(doc(authed, 'academicSupportRequests', 'req3')))
+    const owner = testEnv.authenticatedContext('student-2').firestore()
+    await assertSucceeds(getDoc(doc(owner, 'academicSupportRequests', 'req3')))
+  })
+
+  it('allows ACADEMIC-department staff to read and update any request, but not other departments', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) =>
+      setDoc(doc(ctx.firestore(), 'academicSupportRequests', 'req4'), { requestedBy: 'student-2', status: 'OPEN' }),
+    )
+    const academicDb = testEnv.authenticatedContext('staff-administrative').firestore() // wrong department on purpose
+    await assertFails(getDoc(doc(academicDb, 'academicSupportRequests', 'req4')))
+    await assertFails(updateDoc(doc(academicDb, 'academicSupportRequests', 'req4'), { status: 'IN_PROGRESS' }))
+  })
+
+  it('rejects a student updating their own request status directly (staff-only transition)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) =>
+      setDoc(doc(ctx.firestore(), 'academicSupportRequests', 'req5'), { requestedBy: 'student-1', status: 'OPEN' }),
+    )
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(updateDoc(doc(authed, 'academicSupportRequests', 'req5'), { status: 'RESOLVED' }))
+  })
+})
+
+describe('feedback collection (BR17, BR12: administrative staff)', () => {
+  it('allows a student to submit their own feedback', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertSucceeds(setDoc(doc(authed, 'feedback', 'fb1'), { submittedBy: 'student-1', status: 'OPEN' }))
+  })
+
+  it('rejects submitting feedback under someone else\'s id', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(setDoc(doc(authed, 'feedback', 'fb2'), { submittedBy: 'student-2', status: 'OPEN' }))
+  })
+
+  it('prevents a student reading another student\'s feedback', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'feedback', 'fb3'), { submittedBy: 'student-2', status: 'OPEN' }))
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(getDoc(doc(authed, 'feedback', 'fb3')))
+  })
+
+  it('allows ADMINISTRATIVE-department staff to respond to feedback, but not other departments', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'feedback', 'fb4'), { submittedBy: 'student-2', status: 'OPEN' }))
+    const wrongDept = testEnv.authenticatedContext('staff-society').firestore()
+    await assertFails(updateDoc(doc(wrongDept, 'feedback', 'fb4'), { status: 'RESOLVED', response: 'x' }))
+    const rightDept = testEnv.authenticatedContext('staff-administrative').firestore()
+    await assertSucceeds(updateDoc(doc(rightDept, 'feedback', 'fb4'), { status: 'RESOLVED', response: 'x' }))
+  })
+})
+
+describe('facilityIssues collection (BR21, BR12: administrative staff)', () => {
+  it('allows a student to report their own facility issue', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertSucceeds(setDoc(doc(authed, 'facilityIssues', 'fi1'), { reportedBy: 'student-1', status: 'OPEN' }))
+  })
+
+  it('rejects reporting an issue under someone else\'s id', async () => {
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(setDoc(doc(authed, 'facilityIssues', 'fi2'), { reportedBy: 'student-2', status: 'OPEN' }))
+  })
+
+  it('allows any signed-in user to browse reported issues (transparency, matches lostFoundItems pattern)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'facilityIssues', 'fi3'), { reportedBy: 'student-2', status: 'OPEN' }))
+    const authed = testEnv.authenticatedContext('student-1').firestore()
+    await assertSucceeds(getDoc(doc(authed, 'facilityIssues', 'fi3')))
+  })
+
+  it('rejects a student updating someone else\'s issue, but allows ADMINISTRATIVE staff', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => setDoc(doc(ctx.firestore(), 'facilityIssues', 'fi4'), { reportedBy: 'student-2', status: 'OPEN' }))
+    const otherStudent = testEnv.authenticatedContext('student-1').firestore()
+    await assertFails(updateDoc(doc(otherStudent, 'facilityIssues', 'fi4'), { status: 'RESOLVED' }))
+    const wrongDept = testEnv.authenticatedContext('staff-society').firestore()
+    await assertFails(updateDoc(doc(wrongDept, 'facilityIssues', 'fi4'), { status: 'RESOLVED' }))
+    const rightDept = testEnv.authenticatedContext('staff-administrative').firestore()
+    await assertSucceeds(updateDoc(doc(rightDept, 'facilityIssues', 'fi4'), { status: 'RESOLVED' }))
   })
 })
 

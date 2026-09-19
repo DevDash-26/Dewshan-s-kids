@@ -3,6 +3,21 @@ rules_version = '2';
 // Server-side RBAC enforcement for UCL ONE (NFR4, BR12).
 // UI-level route guards (frontend/src/lib/permissions.ts) mirror this map for
 // UX only — these rules are the actual authorization boundary.
+//
+// BR12 asks for different staff roles (academic, society, finance,
+// administrative) to manage different things, not just a flat STUDENT vs
+// STAFF split. Departments are enforced here, per collection, wherever a
+// real in-app action exists for that department:
+//   ACADEMIC       -> academic support requests
+//   SOCIETY        -> society sign-up records (read-only triage)
+//   ADMINISTRATIVE -> room booking approval, feedback, facility issues
+//   FINANCE        -> no dedicated Firestore-backed action exists yet;
+//                      financial-support content is managed entirely via
+//                      the Strapi CMS (its own separate admin auth), so
+//                      there is nothing in this app's data model for a
+//                      FINANCE-only rule to gate. Documented rather than
+//                      faked with an arbitrary permission.
+// ADMIN always bypasses department checks (full access).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -26,6 +41,12 @@ service cloud.firestore {
       return isSignedIn() && myRole() == 'ADMIN';
     }
 
+    // True for an admin (unconditionally), or a STAFF member whose
+    // staffDepartment matches the department this action requires.
+    function isAdminOrDepartment(dept) {
+      return isAdmin() || (isSignedIn() && myRole() == 'STAFF' && myProfile().staffDepartment == dept);
+    }
+
     function isOwner(field) {
       return isSignedIn() && request.resource.data[field] == request.auth.uid;
     }
@@ -47,7 +68,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ---- Room bookings ----
+    // ---- Room bookings (BR8) ----
     match /roomBookings/{bookingId} {
       // Any signed-in student must be able to list existing bookings for a
       // room/date to check availability before requesting it (BR8). Firestore
@@ -63,7 +84,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.requestedBy == request.auth.uid
         && request.resource.data.status == 'CANCELLED'
         && resource.data.status == 'PENDING';
-      allow update: if isStaffOrAdmin(); // approve / reject
+      allow update: if isAdminOrDepartment('ADMINISTRATIVE'); // approve / reject (BR12: administrative staff)
     }
 
     // ---- Event interest (BR4) ----
@@ -75,8 +96,11 @@ service cloud.firestore {
 
     // ---- Society interest / sign-up (BR6) ----
     match /societyInterests/{interestId} {
-      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isStaffOrAdmin());
-      allow create: if isSignedIn() && isOwner('studentId');
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isAdminOrDepartment('SOCIETY'));
+      // setDoc with a deterministic {contentItemId}_{studentId} id makes a
+      // repeat "join" idempotent (an update, not a second document) rather
+      // than needing an application-level duplicate check.
+      allow create, update: if isSignedIn() && isOwner('studentId');
     }
 
     // ---- Lost & Found (BR7) ----
@@ -86,25 +110,25 @@ service cloud.firestore {
       allow update: if isSignedIn() && (resource.data.reportedBy == request.auth.uid || isStaffOrAdmin());
     }
 
-    // ---- Academic support requests (BR9) ----
+    // ---- Academic support requests (BR9, BR12: academic staff) ----
     match /academicSupportRequests/{reqId} {
-      allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isStaffOrAdmin());
+      allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isAdminOrDepartment('ACADEMIC'));
       allow create: if isSignedIn() && isOwner('requestedBy');
-      allow update: if isStaffOrAdmin();
+      allow update: if isAdminOrDepartment('ACADEMIC');
     }
 
-    // ---- Feedback (BR17) ----
+    // ---- Feedback (BR17, BR12: administrative staff) ----
     match /feedback/{feedbackId} {
-      allow read: if isSignedIn() && (resource.data.submittedBy == request.auth.uid || isStaffOrAdmin());
+      allow read: if isSignedIn() && (resource.data.submittedBy == request.auth.uid || isAdminOrDepartment('ADMINISTRATIVE'));
       allow create: if isSignedIn() && isOwner('submittedBy');
-      allow update: if isStaffOrAdmin();
+      allow update: if isAdminOrDepartment('ADMINISTRATIVE');
     }
 
-    // ---- Facility issue reports (BR21) ----
+    // ---- Facility issue reports (BR21, BR12: administrative staff) ----
     match /facilityIssues/{issueId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isOwner('reportedBy');
-      allow update: if isSignedIn() && (resource.data.reportedBy == request.auth.uid || isStaffOrAdmin());
+      allow update: if isSignedIn() && (resource.data.reportedBy == request.auth.uid || isAdminOrDepartment('ADMINISTRATIVE'));
     }
 
     // ---- Notifications ----

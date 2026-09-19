@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { decideBooking, watchAllBookings } from '../../../lib/collections'
 import type { RoomBooking } from '../../../types/models'
-import { Badge, Button, Card } from '../../../components/ui/Primitives'
+import { Badge, Button, Card, FormError } from '../../../components/ui/Primitives'
 import { EmptyState, Spinner } from '../../../components/ui/Feedback'
 
 const STATUS_COLOR: Record<RoomBooking['status'], 'neutral' | 'green' | 'red' | 'amber'> = {
@@ -14,6 +14,8 @@ const STATUS_COLOR: Record<RoomBooking['status'], 'neutral' | 'green' | 'red' | 
 export function BookingsTab({ decidedBy }: { decidedBy: string }) {
   const [bookings, setBookings] = useState<RoomBooking[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [decidingId, setDecidingId] = useState<string | null>(null)
 
   useEffect(() => {
     const unsub = watchAllBookings((data) => {
@@ -22,6 +24,18 @@ export function BookingsTab({ decidedBy }: { decidedBy: string }) {
     })
     return unsub
   }, [])
+
+  async function handleDecide(bookingId: string, status: 'APPROVED' | 'REJECTED') {
+    setError(null)
+    setDecidingId(bookingId)
+    try {
+      await decideBooking(bookingId, status, decidedBy)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update this booking. Please try again.')
+    } finally {
+      setDecidingId(null)
+    }
+  }
 
   if (loading) return <Spinner />
   if (bookings.length === 0) return <EmptyState title="No booking requests yet" />
@@ -33,6 +47,9 @@ export function BookingsTab({ decidedBy }: { decidedBy: string }) {
     <div className="space-y-6">
       <section>
         <h2 className="mb-2 font-semibold text-slate-800">Pending ({pending.length})</h2>
+        <div className="mb-3">
+          <FormError message={error} />
+        </div>
         {pending.length === 0 ? (
           <EmptyState title="No pending requests" />
         ) : (
@@ -48,8 +65,10 @@ export function BookingsTab({ decidedBy }: { decidedBy: string }) {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => decideBooking(b.id, 'APPROVED', decidedBy)}>Approve</Button>
-                  <Button variant="danger" onClick={() => decideBooking(b.id, 'REJECTED', decidedBy)}>
+                  <Button disabled={decidingId === b.id} onClick={() => handleDecide(b.id, 'APPROVED')}>
+                    {decidingId === b.id ? 'Checking…' : 'Approve'}
+                  </Button>
+                  <Button variant="danger" disabled={decidingId === b.id} onClick={() => handleDecide(b.id, 'REJECTED')}>
                     Reject
                   </Button>
                 </div>

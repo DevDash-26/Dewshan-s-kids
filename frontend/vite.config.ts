@@ -8,9 +8,14 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    // firestore.rules.test.ts and auth.integration.test.ts need the Firebase
-    // emulators running and are run separately via `npm run test:rules` /
-    // `npm run test:auth` (see package.json).
-    exclude: ['**/node_modules/**', '**/firestore.rules.test.ts', '**/auth.integration.test.ts'],
+    // firestore.rules.test.ts, booking-conflict.integration.test.ts, and
+    // auth.integration.test.ts need the Firebase emulators running and are
+    // run separately via `npm run test:rules` / `npm run test:auth`.
+    exclude: [
+      '**/node_modules/**',
+      '**/firestore.rules.test.ts',
+      '**/booking-conflict.integration.test.ts',
+      '**/auth.integration.test.ts',
+    ],
   },
 })
