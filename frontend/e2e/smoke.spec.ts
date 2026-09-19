@@ -98,7 +98,10 @@ test('golden demo path', async ({ page }) => {
     await page.fill('#location', 'Test Location')
     await page.fill('#contact', 'e2e@uclone.lk')
     await page.click('button:has-text("Submit report")')
-    await expect(page.locator('text=E2E Test Item')).toBeVisible({ timeout: 10000 })
+    // .first(): reruns against a shared, non-reset emulator accumulate
+    // multiple "E2E Test Item" rows from earlier runs, which makes a plain
+    // text locator match more than one element (Playwright strict mode).
+    await expect(page.locator('text=E2E Test Item').first()).toBeVisible({ timeout: 10000 })
   })
 
   await test.step('9. AI assistant answers a question', async () => {
