@@ -83,10 +83,16 @@ function App() {
   const [lostFound, setLostFound] = useState<any[]>([]);
   const [faqs, setFaqs] = useState<any[]>([]);
   const [support, setSupport] = useState<any>(null);
+  const [feedback, setFeedback] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [aiQuestion, setAiQuestion] = useState('Are there any events this week?');
   const [aiResponse, setAiResponse] = useState<any>(null);
+  const [feedbackTopic, setFeedbackTopic] = useState('Campus services');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [issueType, setIssueType] = useState('LIGHTING');
+  const [issueLocation, setIssueLocation] = useState('');
+  const [issueDescription, setIssueDescription] = useState('');
   const [isBusy, setIsBusy] = useState(false);
 
   const isLoggedIn = Boolean(token);
@@ -108,8 +114,9 @@ function App() {
       fetch(`${API}/rooms?date=2026-09-25`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
       fetch(`${API}/lost-found`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
       fetch(`${API}/faqs`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-      fetch(`${API}/support`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
-    ]).then(([dashboardData, eventsData, societiesData, roomsData, lostFoundData, faqData, supportData]) => {
+      fetch(`${API}/support`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+      fetch(`${API}/feedback`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
+    ]).then(([dashboardData, eventsData, societiesData, roomsData, lostFoundData, faqData, supportData, feedbackData]) => {
       setDashboard(dashboardData);
       setEvents(eventsData.events || []);
       setSocieties(societiesData.societies || []);
@@ -117,6 +124,7 @@ function App() {
       setLostFound(lostFoundData.items || []);
       setFaqs(faqData.faqs || []);
       setSupport(supportData);
+      setFeedback(feedbackData.items || []);
     }).catch(() => setLoginError('Unable to load campus data.'));
   }, [token]);
 
@@ -234,6 +242,49 @@ function App() {
     });
     const data = await response.json();
     setAiResponse(data);
+  };
+
+  const handleFeedbackSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+
+    const response = await fetch(`${API}/feedback`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: feedbackTopic, message: feedbackMessage })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.message || 'Unable to submit feedback');
+      return;
+    }
+
+    setFeedbackMessage('');
+    const fresh = await fetch(`${API}/feedback`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
+    setFeedback(fresh.items || []);
+    alert('Feedback submitted successfully.');
+  };
+
+  const handleFacilityIssueSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!token) return;
+
+    const response = await fetch(`${API}/facility-issues`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: issueType, location: issueLocation, description: issueDescription })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      alert(data.message || 'Unable to submit facility issue');
+      return;
+    }
+
+    setIssueLocation('');
+    setIssueDescription('');
+    const freshSupport = await fetch(`${API}/support`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
+    setSupport(freshSupport);
+    alert('Facility issue reported.');
   };
 
   const statCards = useMemo(() => [
@@ -439,19 +490,73 @@ function App() {
         {page === 'support' && support && (
           <div className="panel page-panel">
             <h2>Academic and support resources</h2>
-            {support.resources?.map((item: any) => (
-              <div key={item.id} className="card-box">
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <small>{item.contact}</small>
+            <div className="content-grid">
+              <div>
+                <h3>Support services</h3>
+                {support.resources?.map((item: any) => (
+                  <div key={item.id} className="card-box">
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                    <small>{item.contact}</small>
+                  </div>
+                ))}
               </div>
-            ))}
-            {support.jobs?.map((item: any) => (
-              <div key={item.id} className="card-box">
-                <h3>{item.title}</h3>
-                <p>{item.employer} • {item.location} • {item.type}</p>
+              <div>
+                <h3>Service information</h3>
+                {support.serviceInformation?.map((item: any) => (
+                  <div key={item.id} className="card-box">
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div className="content-grid" style={{ marginTop: '1rem' }}>
+              <div>
+                <h3>Submit feedback</h3>
+                <form onSubmit={handleFeedbackSubmit} className="booking-form">
+                  <input value={feedbackTopic} onChange={(e) => setFeedbackTopic(e.target.value)} placeholder="Feedback topic" />
+                  <textarea value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value)} rows={4} placeholder="Share your feedback" style={{ gridColumn: '1 / -1', width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #d5e3f5' }} />
+                  <button type="submit" style={{ gridColumn: '1 / -1' }}>Submit feedback</button>
+                </form>
+              </div>
+              <div>
+                <h3>Report a facility issue</h3>
+                <form onSubmit={handleFacilityIssueSubmit} className="booking-form">
+                  <select value={issueType} onChange={(e) => setIssueType(e.target.value)}>
+                    <option value="LIGHTING">Lighting</option>
+                    <option value="HVAC">HVAC</option>
+                    <option value="CLEANING">Cleaning</option>
+                    <option value="SAFETY">Safety</option>
+                  </select>
+                  <input value={issueLocation} onChange={(e) => setIssueLocation(e.target.value)} placeholder="Location" />
+                  <textarea value={issueDescription} onChange={(e) => setIssueDescription(e.target.value)} rows={4} placeholder="Describe the issue" style={{ gridColumn: '1 / -1', width: '100%', padding: '0.75rem', borderRadius: '10px', border: '1px solid #d5e3f5' }} />
+                  <button type="submit" style={{ gridColumn: '1 / -1' }}>Report issue</button>
+                </form>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <h3>Job opportunities</h3>
+              {support.jobs?.map((item: any) => (
+                <div key={item.id} className="card-box">
+                  <h3>{item.title}</h3>
+                  <p>{item.employer} • {item.location} • {item.type}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <h3>Recent feedback</h3>
+              {feedback.map((item) => (
+                <div key={item.id} className="card-box">
+                  <h3>{item.topic}</h3>
+                  <p>{item.message}</p>
+                  <small>{item.status}</small>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

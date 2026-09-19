@@ -144,6 +144,27 @@ test('lost found validation required fields', async () => {
   assert.equal(result.response.status, 400);
 });
 
+test('feedback submission works', async () => {
+  const token = await login('nimali@student.ucl.ac.lk', 'student123');
+  const result = await request('/api/feedback', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ topic: 'Campus services', message: 'The student support line is helpful.' })
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.body.entry.topic, 'Campus services');
+});
+
+test('facility issue validation works', async () => {
+  const token = await login('nimali@student.ucl.ac.lk', 'student123');
+  const result = await request('/api/facility-issues', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ location: 'Library', description: 'Lights are flickering.' })
+  });
+  assert.equal(result.response.status, 400);
+});
+
 test('ai empty query is rejected', async () => {
   const token = await login('nimali@student.ucl.ac.lk', 'student123');
   const result = await request('/api/ai', {
