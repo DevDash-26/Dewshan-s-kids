@@ -1,3 +1,4 @@
+import { BellRing, CalendarDays, GraduationCap, Search, ShieldCheck, Sparkles } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type Role = 'STUDENT' | 'STAFF' | 'ADMIN';
@@ -301,9 +302,9 @@ function App() {
             <header className="topbar">
               <div>
                 <p className="eyebrow">Welcome back</p>
-                <h1>{user?.name}</h1>
+                <h1 className="flex items-center gap-2"><GraduationCap size={20} /> {user?.name}</h1>
               </div>
-              <div className="pill">Faculty: {user?.faculty || 'Campus'}</div>
+              <div className="pill flex items-center gap-2"><BellRing size={16} /> Faculty: {user?.faculty || 'Campus'}</div>
             </header>
 
             <section className="stats-grid">
@@ -317,7 +318,7 @@ function App() {
 
             <section className="content-grid">
               <div className="panel">
-                <h3>Targeted announcements</h3>
+                <h3 className="flex items-center gap-2"><BellRing size={18} /> Targeted announcements</h3>
                 {dashboard.announcements?.length ? dashboard.announcements.map((item: Announcement) => (
                   <div key={item.id} className="list-item">
                     <div className="tag">{item.category}</div>
@@ -329,7 +330,7 @@ function App() {
               </div>
 
               <div className="panel">
-                <h3>Emergency notices</h3>
+                <h3 className="flex items-center gap-2"><ShieldCheck size={18} /> Emergency notices</h3>
                 {dashboard.emergency?.map((item: any) => (
                   <div key={item.id} className="alert-box">
                     <strong>{item.title}</strong>
@@ -341,7 +342,7 @@ function App() {
 
             <section className="content-grid lower-grid">
               <div className="panel">
-                <h3>Upcoming events</h3>
+                <h3 className="flex items-center gap-2"><CalendarDays size={18} /> Upcoming events</h3>
                 {dashboard.upcomingEvents?.map((item: EventItem) => (
                   <div key={item.id} className="list-item">
                     <h4>{item.title}</h4>
@@ -468,7 +469,7 @@ function App() {
 
         {page === 'ai' && (
           <div className="panel page-panel">
-            <h2>AI campus assistant</h2>
+            <h2 className="flex items-center gap-2"><Sparkles size={18} /> AI campus assistant</h2>
             <div className="ai-row">
               <input value={aiQuestion} onChange={(e) => setAiQuestion(e.target.value)} />
               <button onClick={handleAiQuestion}>Ask</button>
@@ -484,7 +485,7 @@ function App() {
         )}
 
         <div className="panel search-panel">
-          <h3>Unified search</h3>
+          <h3 className="flex items-center gap-2"><Search size={18} /> Unified search</h3>
           <div className="ai-row">
             <input placeholder="Search campus info" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             <button onClick={handleSearch}>Search</button>
