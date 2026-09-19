@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isRelevantToStudent, sortByRelevance } from './targeting'
+import { filterVisibleToStudent, isRelevantToStudent, sortByRelevance } from './targeting'
 import type { ContentItem, UserProfile } from '../types/models'
 
 function makeItem(overrides: Partial<ContentItem>): ContentItem {
@@ -55,8 +55,45 @@ describe('isRelevantToStudent (BR2 targeted announcements)', () => {
     expect(isRelevantToStudent(makeItem({ audience: 'YEAR_GROUP', yearGroup: 3 }), student)).toBe(false)
   })
 
+  it('programme-targeted content only matches the student\'s own programme', () => {
+    expect(isRelevantToStudent(makeItem({ audience: 'PROGRAMME', programme: 'BSc Software Engineering' }), student)).toBe(true)
+    expect(isRelevantToStudent(makeItem({ audience: 'PROGRAMME', programme: 'BSc Data Science' }), student)).toBe(false)
+  })
+
+  it('an emergency notice is always relevant, even if targeted at a different faculty', () => {
+    expect(isRelevantToStudent(makeItem({ isEmergency: true, audience: 'FACULTY', faculty: 'Faculty of Business' }), student)).toBe(true)
+  })
+
   it('treats content as relevant when no profile is available (logged out)', () => {
     expect(isRelevantToStudent(makeItem({ audience: 'FACULTY', faculty: 'Faculty of Business' }), null)).toBe(true)
+  })
+})
+
+describe('filterVisibleToStudent (BR2: exclude content targeted at a different faculty/programme/year)', () => {
+  it('keeps general content, matching-faculty, matching-programme, and matching-year-group content', () => {
+    const general = makeItem({ id: 1, audience: 'EVERYONE' })
+    const matchingFaculty = makeItem({ id: 2, audience: 'FACULTY', faculty: 'Faculty of Computing' })
+    const matchingProgramme = makeItem({ id: 3, audience: 'PROGRAMME', programme: 'BSc Software Engineering' })
+    const matchingYear = makeItem({ id: 4, audience: 'YEAR_GROUP', yearGroup: 2 })
+
+    const visible = filterVisibleToStudent([general, matchingFaculty, matchingProgramme, matchingYear], student)
+
+    expect(visible.map((i) => i.id).sort()).toEqual([1, 2, 3, 4])
+  })
+
+  it('excludes content targeted exclusively at a different faculty, programme, or year group', () => {
+    const otherFaculty = makeItem({ id: 5, audience: 'FACULTY', faculty: 'Faculty of Business' })
+    const otherProgramme = makeItem({ id: 6, audience: 'PROGRAMME', programme: 'BSc Data Science' })
+    const otherYear = makeItem({ id: 7, audience: 'YEAR_GROUP', yearGroup: 4 })
+
+    const visible = filterVisibleToStudent([otherFaculty, otherProgramme, otherYear], student)
+
+    expect(visible).toHaveLength(0)
+  })
+
+  it('never excludes an emergency notice regardless of its stated audience', () => {
+    const emergencyForOtherFaculty = makeItem({ id: 8, isEmergency: true, audience: 'FACULTY', faculty: 'Faculty of Business' })
+    expect(filterVisibleToStudent([emergencyForOtherFaculty], student)).toHaveLength(1)
   })
 })
 

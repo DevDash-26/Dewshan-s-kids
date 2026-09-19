@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { AlertOctagon, BookOpen, CalendarDays, DoorOpen, MessageSquareText, PackageSearch, Sparkles, Users } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useContentItems } from '../../hooks/useContentItems'
-import { sortByRelevance } from '../../lib/targeting'
+import { filterVisibleToStudent, sortByRelevance } from '../../lib/targeting'
 import { ContentCard } from '../../components/content/ContentCard'
 import { Card } from '../../components/ui/Primitives'
 import { EmptyState, ServiceUnavailable, Spinner } from '../../components/ui/Feedback'
@@ -34,9 +34,19 @@ export function DashboardPage() {
     .filter((i) => i.category === 'EVENT')
     .sort((a, b) => (a.eventDate ?? '').localeCompare(b.eventDate ?? ''))
     .slice(0, 3)
-  const jobs = items.filter((i) => i.category === 'JOB').slice(0, 3)
-  const calendar = items
-    .filter((i) => i.category === 'ACADEMIC_CALENDAR')
+  // BR2: the dashboard is a personalised view, so content targeted
+  // exclusively at another faculty/programme/year is excluded here (not
+  // just sorted lower) - see lib/targeting.ts. Search & Discover
+  // deliberately does not apply this filter, since browsing everything is
+  // its whole point.
+  const jobs = filterVisibleToStudent(
+    items.filter((i) => i.category === 'JOB'),
+    profile,
+  ).slice(0, 3)
+  const calendar = filterVisibleToStudent(
+    items.filter((i) => i.category === 'ACADEMIC_CALENDAR'),
+    profile,
+  )
     .sort((a, b) => (a.eventDate ?? '').localeCompare(b.eventDate ?? ''))
     .slice(0, 3)
 

@@ -8,6 +8,17 @@ function stripHtml(input: string): string {
   return input.replace(/<[^>]*>/g, '')
 }
 
+// The specific value, not just the audience type - "Targeted: faculty" alone
+// doesn't tell a student whether it's even for them; on pages where
+// off-audience content can still appear (e.g. Search & Discover, which
+// intentionally doesn't filter by targeting) this disambiguates it.
+function targetingLabel(item: ContentItem): string | null {
+  if (item.audience === 'FACULTY') return item.faculty ? `For: ${item.faculty}` : 'Targeted: faculty'
+  if (item.audience === 'PROGRAMME') return item.programme ? `For: ${item.programme}` : 'Targeted: programme'
+  if (item.audience === 'YEAR_GROUP') return item.yearGroup ? `For: Year ${item.yearGroup}` : 'Targeted: year group'
+  return null
+}
+
 export function ContentCard({ item, actions }: { item: ContentItem; actions?: ReactNode }) {
   return (
     <Card className={item.isEmergency ? 'border-red-300 bg-red-50' : ''}>
@@ -20,7 +31,7 @@ export function ContentCard({ item, actions }: { item: ContentItem; actions?: Re
           </Badge>
         )}
         <Badge color="blue">{CATEGORY_LABELS[item.category]}</Badge>
-        {item.audience !== 'EVERYONE' && <Badge color="amber">Targeted: {item.audience.replace('_', ' ').toLowerCase()}</Badge>}
+        {targetingLabel(item) && <Badge color="amber">{targetingLabel(item)}</Badge>}
       </div>
       <h3 className="font-semibold text-slate-900">{item.title}</h3>
       <p className="mt-1 text-sm text-slate-600">{stripHtml(item.description)}</p>
