@@ -12,7 +12,8 @@
     "start": "strapi start",
     "strapi": "strapi",
     "upgrade": "npx @strapi/upgrade latest",
-    "upgrade:dry": "npx @strapi/upgrade latest --dry"
+    "upgrade:dry": "npx @strapi/upgrade latest --dry",
+    "verify:security": "node scripts/verify-public-api-security.mjs"
   },
   "dependencies": {
     "@strapi/database": "5.54.0",
