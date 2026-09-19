@@ -1,0 +1,90 @@
+{
+  "kind": "collectionType",
+  "collectionName": "content_items",
+  "info": {
+    "singularName": "content-item",
+    "pluralName": "content-items",
+    "displayName": "Content Item",
+    "description": "Unified reusable content engine covering campus information categories (announcements, events, societies, calendar, support resources, etc.)."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "richtext",
+      "required": true
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": [
+        "ANNOUNCEMENT",
+        "EVENT",
+        "SOCIETY",
+        "ACADEMIC_CALENDAR",
+        "ONBOARDING",
+        "VOLUNTEERING",
+        "ALUMNI",
+        "JOB",
+        "FINANCIAL_SUPPORT",
+        "WELLBEING",
+        "IT_SUPPORT",
+        "LIBRARY",
+        "DINING",
+        "PRINTING",
+        "TEXTBOOK",
+        "GUEST_LECTURE",
+        "SPORTS",
+        "STUDENT_LIFE",
+        "FAQ",
+        "EMERGENCY",
+        "SCHEDULE_CHANGE",
+        "STAFF_DIRECTORY"
+      ],
+      "required": true
+    },
+    "audience": {
+      "type": "enumeration",
+      "enum": ["EVERYONE", "FACULTY", "PROGRAMME", "YEAR_GROUP"],
+      "default": "EVERYONE",
+      "required": true
+    },
+    "faculty": {
+      "type": "string"
+    },
+    "programme": {
+      "type": "string"
+    },
+    "yearGroup": {
+      "type": "integer"
+    },
+    "eventDate": {
+      "type": "date"
+    },
+    "startTime": {
+      "type": "time"
+    },
+    "endTime": {
+      "type": "time"
+    },
+    "location": {
+      "type": "string"
+    },
+    "contact": {
+      "type": "string"
+    },
+    "isEmergency": {
+      "type": "boolean",
+      "default": false
+    },
+    "createdBy_display": {
+      "type": "string",
+      "description": "Human-readable author/department shown to students (e.g. 'Faculty of Computing Office')."
+    }
+  }
+}
