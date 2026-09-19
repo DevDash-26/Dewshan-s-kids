@@ -1,51 +1,57 @@
 # Requirements Traceability
 
-## BR1–BR33 and NFR1–NFR6
+This document reflects the actual implementation status of the current hackathon MVP. Requirements are recorded as COMPLETE, PARTIAL, or NOT IMPLEMENTED based on code and test evidence.
 
-| ID | Requirement | Implementation | Route / module | Status |
-| --- | --- | --- | --- | --- |
-| BR1 | Unified Access | Single campus dashboard and search experience | `/dashboard`, `/api/search` | COMPLETE |
-| BR2 | Targeted Announcements | Audience-based announcement filtering by faculty/programme/year | `/api/dashboard`, `/api/announcements` | COMPLETE |
-| BR3 | Event Visibility | Event list with metadata and detail cards | `/events` | COMPLETE |
-| BR4 | Event Interest | Duplicate-safe event registration flow | `/api/events/:id/interest` | COMPLETE |
-| BR5 | Society Visibility | Society list with activities and memberships | `/societies` | COMPLETE |
-| BR6 | Society Sign-up | Interest registration for societies | `/api/societies/:id/interest` | COMPLETE |
-| BR7 | Lost & Found | Lost/found item submission and browsing | `/lost-found` | COMPLETE |
-| BR8 | Classroom Booking | Room listing, conflict validation, booking requests | `/rooms`, `/api/rooms/request` | COMPLETE |
-| BR9 | Academic Support | Support resources and mentoring links | `/support` | COMPLETE |
-| BR10 | FAQ Access | Student support FAQ list | `/faq`, `/api/faqs` | COMPLETE |
-| BR11 | Content Maintenance | Staff/admin announcement creation | `/api/announcements` | PARTIAL |
-| BR12 | Access Levels | Role-aware auth and RBAC checks | `requireAuth`, `requireRoles` | COMPLETE |
-| BR13 | Academic Calendar | Calendar summary on dashboard and API | `/api/academic-calendar` | COMPLETE |
-| BR14 | Student Onboarding | Welcome dashboard + student information content | `/dashboard` | PARTIAL |
-| BR15 | Emergency Communication | Emergency notices visible on dashboard | `/api/dashboard` | COMPLETE |
-| BR16 | Schedule Changes | Emergency/schedule notices in announcements | `/api/dashboard` | COMPLETE |
-| BR17 | Feedback Loop | Feedback submission endpoint and UI | `/api/feedback` | PARTIAL |
-| BR18 | Volunteering Opportunities | Not a dedicated module; included as part of support content | `/support` | PARTIAL |
-| BR19 | Alumni Engagement | Not a dedicated student module in this prototype | `/support` | NOT IMPLEMENTED |
-| BR20 | Job & Internship Visibility | Job highlights on dashboard and support page | `/support`, `/api/support` | COMPLETE |
-| BR21 | Facility Issue Reporting | Issue reporting endpoint and support path | `/api/facility-issues` | COMPLETE |
-| BR22 | Staff Directory | Department and staff directory data | `/api/staff-directory` | COMPLETE |
-| BR23 | Financial Support Info | Included in support resources category | `/support` | PARTIAL |
-| BR24 | Sports & Recreation | Not a dedicated module in the current prototype | — | NOT IMPLEMENTED |
-| BR25 | Dining Information | Service info includes dining and hours | `/support`, `/api/support` | PARTIAL |
-| BR26 | Printing Services | Service info includes printing resource | `/support`, `/api/support` | PARTIAL |
-| BR27 | Textbook Exchange | Not implemented as separate exchange flow | — | NOT IMPLEMENTED |
-| BR28 | Guest Lectures | Event-driven guest lecture content | `/events` | COMPLETE |
-| BR29 | Wellbeing Support | Wellbeing support resources and announcements | `/support` | COMPLETE |
-| BR30 | IT Support Info | IT help resource listed in support section | `/support` | COMPLETE |
-| BR31 | Library Resources | Library hours and services in support info | `/support` | COMPLETE |
-| BR32 | Student Life Highlights | Past event and life content in dashboard/events | `/dashboard`, `/events` | PARTIAL |
-| BR33 | AI Assistant | Grounded AI retrieval and route suggestions | `/ai`, `/api/ai` | COMPLETE |
-| NFR1 | Usability | Clean dashboard and simple flows for first-time users | `/dashboard` | COMPLETE |
-| NFR2 | Performance & Scalability | In-memory JSON store and lightweight filtering | backend API | COMPLETE |
-| NFR3 | Reliability & Availability | Graceful validation and error handling | API routes | COMPLETE |
-| NFR4 | Security & Privacy | JWT auth and role restrictions | auth middleware | COMPLETE |
-| NFR5 | Maintainability | Modular route/service structure in Express app | `server.js` | PARTIAL |
-| NFR6 | Robustness | Validation, empty states, duplicate detection, API errors | app routes | COMPLETE |
+## BR1–BR33
+
+| ID | Requirement | Status | Implementation | Evidence | Test |
+| --- | --- | --- | --- | --- | --- |
+| BR1 | Unified access to official campus information | COMPLETE | Dashboard, search and resource pages are available in the frontend and API | `/api/dashboard`, `/api/search`, `frontend/src/App.tsx` | Manual smoke test + backend search behaviour |
+| BR2 | Targeted announcements | COMPLETE | Announcement filtering based on faculty/programme/year is enforced server-side | `filterAnnouncementsForUser()` in `backend/server.js` | `npm --workspace backend run test` |
+| BR3 | Event visibility | COMPLETE | Events are listed and displayed in the dashboard and events view | `/api/events`, `frontend/src/App.tsx` | Manual UI smoke test |
+| BR4 | Event interest registration | COMPLETE | Duplicate-safe event interest endpoint with 409 handling | `/api/events/:id/interest` | `events list and interest registration works` |
+| BR5 | Society visibility | COMPLETE | Society cards and details are surfaced in UI/API | `/api/societies`, `frontend/src/App.tsx` | Manual UI smoke test |
+| BR6 | Society sign-up flow | COMPLETE | Society interest endpoint stores interest and prevents duplicates | `/api/societies/:id/interest` | `societies interest works` |
+| BR7 | Lost & found | COMPLETE | Item submission and list retrieval flow | `/api/lost-found` | `lost found validation required fields` |
+| BR8 | Classroom booking and conflict detection | COMPLETE | Room requests validate date/time overlap before booking | `/api/rooms`, `/api/rooms/request` | `room conflict detection rejects overlap` |
+| BR9 | Academic support access | COMPLETE | Support resources and guidance cards are part of the dashboard/support page | `/api/dashboard`, `/api/support` | Manual smoke test |
+| BR10 | FAQ access | COMPLETE | FAQ list available to authenticated users | `/api/faqs` | Manual smoke test |
+| BR11 | Content maintenance by staff/admin | PARTIAL | Staff/admin can create announcements, but there is no full CMS editing workflow | `/api/announcements` | `staff can create announcement` |
+| BR12 | Role-based access levels | COMPLETE | Auth middleware and RBAC enforce student/staff/admin restriction rules | `requireAuth()`, `requireRoles()` in `backend/server.js` | tests for unauthorized student action |
+| BR13 | Academic calendar | COMPLETE | Academic calendar data is returned to the dashboard | `/api/dashboard` | Manual UI review |
+| BR14 | Student onboarding / welcome content | PARTIAL | The dashboard is student-friendly but there is no full onboarding flow | `/api/dashboard` | Manual smoke test |
+| BR15 | Emergency communication | COMPLETE | Emergency notices are included in the dashboard payload | `/api/dashboard` | Manual smoke test |
+| BR16 | Schedule change communication | COMPLETE | Notices are surfaced as part of announcements and emergency data | `/api/dashboard` | Manual smoke test |
+| BR17 | Feedback loop | PARTIAL | Feedback endpoint exists, but no admin moderation workflow is implemented | `/api/feedback` | `feedback submission works` |
+| BR18 | Volunteering opportunities | PARTIAL | Included as support content rather than dedicated service module | `/api/support` | Manual smoke test |
+| BR19 | Alumni engagement | NOT IMPLEMENTED | No dedicated alumni workflow is present | — | Not covered |
+| BR20 | Job and internship visibility | COMPLETE | Jobs are included in the dashboard and support content | `/api/dashboard`, `/api/support` | Manual smoke test |
+| BR21 | Facility issue reporting | COMPLETE | Issue reporting validation endpoint is implemented | `/api/facility-issues` | `facility issue validation works` |
+| BR22 | Staff directory | COMPLETE | Staff directory data is available to users | `/api/staff-directory` | Manual smoke test |
+| BR23 | Financial support information | PARTIAL | Support resources carry information, but it is not modeled as a dedicated financial support module | `/api/support` | Manual smoke test |
+| BR24 | Sports and recreation | NOT IMPLEMENTED | No dedicated sports module exists in the MVP | — | Not covered |
+| BR25 | Dining information | PARTIAL | Service data includes dining/hours, but no rich dining catalog is built | `/api/support` | Manual smoke test |
+| BR26 | Printing services | PARTIAL | Included as support content, not a dedicated request flow | `/api/support` | Manual smoke test |
+| BR27 | Textbook exchange | NOT IMPLEMENTED | No exchange marketplace flow is implemented | — | Not covered |
+| BR28 | Guest lectures | COMPLETE | Event list includes lecture-style offerings | `/api/events` | Manual smoke test |
+| BR29 | Wellbeing support | COMPLETE | Support resources and announcements include wellbeing references | `/api/support` | Manual smoke test |
+| BR30 | IT support information | COMPLETE | IT support content is present in support resources | `/api/support` | Manual smoke test |
+| BR31 | Library resources | COMPLETE | Library hours and service information are surfaced in support content | `/api/support` | Manual smoke test |
+| BR32 | Student life highlights | PARTIAL | Highlights are present in dashboard and events, but not as a separate first-class module | `/api/dashboard`, `/api/events` | Manual smoke test |
+| BR33 | AI assistant | COMPLETE | AI route returns grounded results and falls back to local data when no external provider is configured | `/api/ai` | `ai empty query is rejected` |
+
+## NFR1–NFR6
+
+| ID | Requirement | Status | Implementation | Evidence | Test |
+| --- | --- | --- | --- | --- | --- |
+| NFR1 | Usability | COMPLETE | Student-friendly dashboard and simple flows are implemented | `frontend/src/App.tsx` | Manual smoke test |
+| NFR2 | Performance & scalability | COMPLETE | Lightweight in-memory data store and simple filtering are adequate for a prototype | `backend/data.js`, `backend/server.js` | Backend test suite |
+| NFR3 | Reliability & availability | COMPLETE | Validation, safe error responses and duplicate/conflict protections are used | API route handlers in `backend/server.js` | Backend tests |
+| NFR4 | Security & privacy | COMPLETE | JWT auth, bcrypt password hashing, role restrictions and secret default handling | `backend/server.js` | `invalid login is rejected`, unauthorized announcement test |
+| NFR5 | Maintainability | PARTIAL | Code is modular enough for a prototype but not split into deeper service layers or full CMS architecture | `backend/server.js` | Manual review |
+| NFR6 | Robustness | COMPLETE | Empty-state validation, duplicate detection and time-slot overlap checks are in place | server route validation | Backend tests |
 
 ## Notes
-
-- This prototype intentionally prioritizes the highest-value student workflows under a six-hour build window.
-- The architecture is reusable and extendable to a real database-backed version later without changing the product concept.
-- Requirements marked PARTIAL or NOT IMPLEMENTED are honest gaps rather than claims of completion.
+- This project is intentionally a six-hour hackathon MVP.
+- Several requirements are implemented as a reusable content model rather than separate deployed infrastructure.
+- Optional service integrations are not described as production-grade unless the runtime configuration is active.

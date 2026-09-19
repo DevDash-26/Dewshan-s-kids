@@ -1,62 +1,99 @@
 # UCL ONE Hackathon Report
 
-## Project overview
+## Problem
 
-UCL ONE is a unified campus platform prototype designed to centralize official student information, services, and actions into a single digital experience. The system combines a role-aware dashboard, announcement filtering, event and society engagement, room booking, support resources, and a grounded AI assistant.
+Students typically move across disconnected systems for announcements, service information, events, classroom bookings, and campus support. The challenge was to provide a trusted single experience that surfaces official information and enables key student workflows without relying on an enterprise stack during a six-hour build window.
 
-## Why this project matters
+## Solution
 
-Students typically navigate multiple disconnected systems: social groups, email threads, noticeboards, physical service desks, and informal word-of-mouth. UCL ONE addresses this by creating a trusted single experience for official campus information and core student workflows.
-
-## Product goals
-
-- Reduce information fragmentation across student life
-- Improve discoverability of official events, support and resources
-- Empower students to act directly from one platform
-- Ensure role-aware access across student, staff and admin flows
-- Provide a grounded AI assistant for quick campus guidance
-
-## Key features implemented
-
-- Student dashboard with personalised announcements
-- Event listing and interest registration with duplicate prevention
-- Society interest registration
-- Room booking request flow with schedule overlap detection
-- Lost & found submission and browsing
-- Support resources, FAQ and staff information
-- Search service for campus content
-- Local AI-backed responder grounded in app data
-- Authenticated access with JWT and role restrictions
+UCL ONE is a campus experience prototype that brings together a personalised dashboard, event and society engagement, room booking, support/resources, FAQ, search, and a grounded AI assistant behind a single authenticated interface. The application focuses on the highest-value student actions and keeps the architecture lightweight enough to be reliable and demo-ready.
 
 ## Architecture
 
 - Frontend: React + TypeScript + Vite
-- Backend: Node.js + Express
-- Authentication: JWT with bcrypt password hashing
-- Data layer: in-memory seeded JSON for rapid prototype development
-- Validation: Node test runner with API-level checks
+- Styling: Tailwind CSS
+- Icons: Lucide React
+- API: Express.js
+- Identity and authorization: JWT with bcryptjs
+- Data layer: seeded in-memory JSON data
+- AI: grounded local response engine with optional Gemini enhancement when configured
 
-## Validation evidence
+## Requirement prioritization
 
-The implementation was validated with the following commands:
+The implementation prioritizes the core student journey:
+1. Sign in and role-aware access
+2. Personalized dashboard and official announcements
+3. Event and society engagement
+4. Room booking and conflict validation
+5. Support resources, FAQs and staff access
+6. AI guidance and search
 
-- `cd "F:/Downloads/HACKEN/CODE/Dewshan-s-kids" && node --test backend/server.test.js`
-  - Result: 9 tests passed, 0 failed
-- `cd "F:/Downloads/HACKEN/CODE/Dewshan-s-kids/frontend" && npm run build`
-  - Result: production build succeeded in 2.48s
+This prioritization preserves a coherent demo path and keeps the prototype focused on the features that matter most to the judge and the users.
 
-## Scope and trade-offs
+## Implementation
 
-This is a six-hour hackathon MVP and therefore prioritises a working, testable campus experience over deep production-scale infrastructure. The prototype intentionally uses in-memory data to keep the app reliable and demo-ready during the event window.
+The platform includes the following working flows:
+- Student login and role-aware dashboard access
+- Targeted announcements filtered by role and profile metadata
+- Event listing and duplicate-safe interest registration
+- Society browsing and membership interest
+- Classroom request flow with overlap detection
+- Lost & found reporting and browsing
+- FAQ and support resource access
+- Staff/admin announcement creation with authorization checks
+- Search across campus data
+- AI assistance grounded in app data with safe fallback behaviour
 
-## Recommended next steps
+## Authentication and authorization
 
-- Replace the in-memory store with PostgreSQL or a real database layer
-- Add proper CMS/admin tooling for content management
-- Add real notifications and reminders
-- Integrate a production AI service behind the grounded local fallback
-- Expand the support and service modules for broader campus operations
+Authentication is handled through JWT tokens issued on successful login. Passwords are hashed with bcryptjs before comparison. The backend enforces authentication and role checks with middleware for student-only and staff/admin-only actions. This is the core security mechanism used on the MVP.
+
+## AI
+
+The AI route is designed to work even without an external provider. When `GEMINI_API_KEY` is not configured, the backend returns a grounded response built from local campus data. When a real Gemini key is present, the system can optionally route the request to the external model. The fall-back path keeps the demo stable and reproducible.
+
+## Testing
+
+The implementation was validated using the real backend suite and a frontend production build:
+- `npm --workspace backend run test` → passed with 11 tests, 0 failed
+- `npm --workspace frontend run build` → succeeded
+
+The backend tests cover login, role enforcement, duplicate handling, room conflicts, validation, and AI input rejection.
+
+## Security
+
+Security in the current prototype is intentionally pragmatic and relevant for a hackathon MVP:
+- JWT-based session protection
+- Password hashing
+- Role restrictions for privileged actions
+- Input validation for required fields and duplicate/conflict cases
+- Default secrets only for local demonstration; real secret management would be required in production
+
+## Robustness
+
+The backend includes validation for required inputs, duplicate event/society interest, room overlap, invalid credentials, and empty AI prompts. These checks prevent common user errors and keep the demo stable.
+
+## Innovation
+
+The key innovation is the integration of trust, access, and action in one place: the user receives canonical campus information, can act directly from the same interface, and benefits from AI guidance grounded in campus data rather than open-ended unstructured answers.
+
+## Limitations
+
+This is not a production-scale deployment. The prototype intentionally uses:
+- in-memory JSON data instead of a durable database
+- no live CMS or content management backend
+- no production cloud authentication system
+- no live multi-tenant deployment infrastructure
+- optional external service integrations that are not required for the demo
+
+## Future improvements
+
+- Replace the local data store with PostgreSQL or another durable database
+- Add real staff/admin content management workflows
+- Integrate live Firebase or similar identity/storage services when needed
+- Connect a production-grade AI provider behind the fallback layer
+- Expand support and service modules for broader campus operations
 
 ## Final assessment
 
-The project successfully demonstrates a realistic and usable campus platform MVP that is technically defensible, tested, and demo-ready within the challenge constraints.
+The project demonstrates a working, testable, demo-ready campus platform MVP. It is technically defensible within the constraints of a six-hour hackathon build, but it should be described honestly as a prototype with optional service hooks rather than a deployed cloud-native production system.
