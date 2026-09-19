@@ -66,7 +66,7 @@ export function EventsPage() {
                   <>
                     <Button
                       variant={interested ? 'secondary' : 'primary'}
-                      disabled={busyId === item.id}
+                      disabled={busyId === item.id || !profile}
                       onClick={() => toggleInterest(item.id)}
                     >
                       {interested ? (

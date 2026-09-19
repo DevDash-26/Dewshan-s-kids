@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Playwright output (screenshots/reports from local test:e2e runs)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # Environment variables (never commit real Firebase/Gemini credentials)
 .env
 .env.*

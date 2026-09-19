@@ -39,7 +39,10 @@ export function FacilityIssuesPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!profile) return
+    if (!profile) {
+      setError('Your session hasn\'t finished loading yet — please wait a moment and try again.')
+      return
+    }
     if (!location.trim() || !description.trim()) {
       setError('Please describe the location and issue.')
       return

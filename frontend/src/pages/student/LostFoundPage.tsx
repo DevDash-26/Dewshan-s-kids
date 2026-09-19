@@ -39,7 +39,10 @@ export function LostFoundPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!profile) return
+    if (!profile) {
+      setError('Your session hasn\'t finished loading yet — please wait a moment and try again.')
+      return
+    }
     if (!form.itemName.trim() || !form.description.trim() || !form.location.trim() || !form.contact.trim()) {
       setError('Please fill in every field.')
       return

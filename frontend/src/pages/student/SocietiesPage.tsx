@@ -44,7 +44,11 @@ export function SocietiesPage() {
               key={item.id}
               item={item}
               actions={
-                <Button variant={joined.has(item.id) ? 'secondary' : 'primary'} disabled={busyId === item.id} onClick={() => handleJoin(item.id)}>
+                <Button
+                  variant={joined.has(item.id) ? 'secondary' : 'primary'}
+                  disabled={busyId === item.id || !profile || joined.has(item.id)}
+                  onClick={() => handleJoin(item.id)}
+                >
                   {joined.has(item.id) ? (
                     <>
                       <CheckCircle2 className="h-4 w-4" /> Interest sent

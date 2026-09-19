@@ -80,7 +80,10 @@ export function RoomsPage() {
   }
 
   async function requestRoom(room: Room) {
-    if (!profile) return
+    if (!profile) {
+      setError('Your session hasn\'t finished loading yet — please wait a moment and try again.')
+      return
+    }
     if (!purpose.trim()) {
       setError('Please describe the purpose of your booking.')
       return

@@ -16,6 +16,7 @@ export default defineConfig({
       '**/firestore.rules.test.ts',
       '**/booking-conflict.integration.test.ts',
       '**/auth.integration.test.ts',
+      'e2e/**', // Playwright specs, run via `npm run test:e2e`, not vitest
     ],
   },
 })

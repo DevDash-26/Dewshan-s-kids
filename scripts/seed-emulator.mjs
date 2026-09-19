@@ -11,9 +11,38 @@
 // Usage: firebase emulators:exec --project ucl-one-demo "node scripts/seed-emulator.mjs"
 // or, with emulators already running: node scripts/seed-emulator.mjs
 
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+
+// The project id MUST match frontend/.env's VITE_FIREBASE_PROJECT_ID, or the
+// running app queries an entirely different (empty) namespace in the
+// emulator than the one this script seeds - the app then behaves as if
+// nothing was ever seeded (profile lookups silently return null) with no
+// error, since a missing document isn't a permissions failure. Previously
+// this was hardcoded to 'ucl-one-demo' regardless of what the frontend
+// actually used, which is exactly the failure mode this reads around: the
+// project id is read from frontend/.env when present, so seeding always
+// targets whatever project the app is actually configured for.
+function readFrontendProjectId() {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const envPath = resolve(__dirname, '../frontend/.env');
+    const contents = readFileSync(envPath, 'utf8');
+    const match = contents.match(/^VITE_FIREBASE_PROJECT_ID\s*=\s*(.*)$/m);
+    if (!match) return null;
+    // Tolerates a stray trailing comma/quote from a config snippet pasted
+    // directly in rather than reformatted to KEY=value.
+    return match[1].trim().replace(/^["']|["',]+$/g, '') || null;
+  } catch {
+    return null;
+  }
+}
+
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID ?? readFrontendProjectId() ?? 'ucl-one-demo';
 
 const AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? '127.0.0.1:9099';
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
@@ -32,7 +61,8 @@ for (const [name, value] of [
 process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH_EMULATOR_HOST;
 process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE_EMULATOR_HOST;
 
-const app = initializeApp({ projectId: 'ucl-one-demo' });
+console.log(`[seed] targeting emulator project: ${PROJECT_ID}`);
+const app = initializeApp({ projectId: PROJECT_ID });
 const auth = getAuth(app);
 const db = getFirestore(app);
 

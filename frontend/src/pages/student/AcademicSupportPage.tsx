@@ -40,7 +40,10 @@ export function AcademicSupportPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!profile) return
+    if (!profile) {
+      setError('Your session hasn\'t finished loading yet — please wait a moment and try again.')
+      return
+    }
     if (!subject.trim() || !details.trim()) {
       setError('Please fill in the subject and details.')
       return

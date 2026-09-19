@@ -52,7 +52,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const snap = await getDoc(doc(db, 'users', user.uid))
           setProfile(snap.exists() ? (snap.data() as UserProfile) : null)
-        } catch {
+        } catch (err) {
+          // Logged (not surfaced to the UI) so a missing/unreadable profile
+          // is diagnosable from the console instead of silently presenting
+          // as "profile: null" with no trace of why.
+          console.error('Failed to load user profile:', err)
           setProfile(null)
         }
       } else {
