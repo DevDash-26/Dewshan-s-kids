@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// Server-side RBAC enforcement for UCL ONE (NFR4, BR12).
+// UI-level route guards (frontend/src/lib/permissions.ts) mirror this map for
+// UX only — these rules are the actual authorization boundary.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myRole() {
+      return isSignedIn() ? myProfile().role : null;
+    }
+
+    function isStaffOrAdmin() {
+      return isSignedIn() && myRole() in ['STAFF', 'ADMIN'];
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() == 'ADMIN';
+    }
+
+    function isOwner(field) {
+      return isSignedIn() && request.resource.data[field] == request.auth.uid;
+    }
+
+    // ---- Users ----
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isStaffOrAdmin());
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == 'STUDENT'; // public signup can never grant STAFF/ADMIN
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role; // students can't self-promote
+      allow update: if isAdmin(); // admin console can change roles/departments
+    }
+
+    // ---- Rooms (reference data) ----
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- Room bookings ----
+    match /roomBookings/{bookingId} {
+      // Any signed-in student must be able to list existing bookings for a
+      // room/date to check availability before requesting it (BR8). Firestore
+      // rejects a `list` query as unsafe if its rule depends on a field the
+      // query doesn't filter on (e.g. requestedBy) even when zero documents
+      // would match, so booking records can't be owner-restricted the way
+      // other collections are. This is campus scheduling data, not sensitive
+      // personal data, so we treat it like a shared calendar.
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isOwner('requestedBy')
+        && request.resource.data.status == 'PENDING';
+      allow update: if isSignedIn() && resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'CANCELLED'
+        && resource.data.status == 'PENDING';
+      allow update: if isStaffOrAdmin(); // approve / reject
+    }
+
+    // ---- Event interest (BR4) ----
+    match /eventInterests/{interestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner('studentId');
+      allow delete: if isSignedIn() && resource.data.studentId == request.auth.uid;
+    }
+
+    // ---- Society interest / sign-up (BR6) ----
+    match /societyInterests/{interestId} {
+      allow read: if isSignedIn() && (resource.data.studentId == request.auth.uid || isStaffOrAdmin());
+      allow create: if isSignedIn() && isOwner('studentId');
+    }
+
+    // ---- Lost & Found (BR7) ----
+    match /lostFoundItems/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner('reportedBy');
+      allow update: if isSignedIn() && (resource.data.reportedBy == request.auth.uid || isStaffOrAdmin());
+    }
+
+    // ---- Academic support requests (BR9) ----
+    match /academicSupportRequests/{reqId} {
+      allow read: if isSignedIn() && (resource.data.requestedBy == request.auth.uid || isStaffOrAdmin());
+      allow create: if isSignedIn() && isOwner('requestedBy');
+      allow update: if isStaffOrAdmin();
+    }
+
+    // ---- Feedback (BR17) ----
+    match /feedback/{feedbackId} {
+      allow read: if isSignedIn() && (resource.data.submittedBy == request.auth.uid || isStaffOrAdmin());
+      allow create: if isSignedIn() && isOwner('submittedBy');
+      allow update: if isStaffOrAdmin();
+    }
+
+    // ---- Facility issue reports (BR21) ----
+    match /facilityIssues/{issueId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner('reportedBy');
+      allow update: if isSignedIn() && (resource.data.reportedBy == request.auth.uid || isStaffOrAdmin());
+    }
+
+    // ---- Notifications ----
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isStaffOrAdmin();
+    }
+  }
+}
